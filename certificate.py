@@ -27,9 +27,8 @@
         签名日期
         有效日期
 """
-import random
+import random,time,os
 from M2Crypto import EC,RSA
-
 class _EC(object):
     _curves_name = {
         707:'NID_secp128r2',
@@ -164,7 +163,9 @@ class _EC(object):
         'NID_wap_wsg_idm_ecid_wtls10':743,
         'NID_wap_wsg_idm_ecid_wtls11':744,
         'NID_wap_wsg_idm_ecid_wtls12':745,
-        }
+    }
+    _key = None
+    _pubkey = None
     def __init__(self):
         pass
     def generate(self,**argv):
@@ -172,11 +173,25 @@ class _EC(object):
         if argv.has_key('curve'):
             curve = argv['curve']
         else:
-            curve = random.choice(self._curves_id)
+            curve = random.choice(self._curves_id.items())
+            curve = curve[1]
         if not self._curves_name.has_key(curve):
             raise Exception("User desired impractical EC parameter.")
-        curve_name = self._curves_name(curve)
-        # 
+        curve_name = self._curves_name[curve]
+        # generate a new EC instance, init both secret and public key instance.
+        self._key = EC.gen_params(curve)
+        self._key.gen_key()
+        self._derive_pubkey()
+        
+        print "Generated new EC key basing on %s." % curve_name
+    def _derive_pubkey(self):
+        # derive EC public key instance from self._key
+        if self._key == None:
+            return False
+        filename = 'temp' + str(int(random.random()))
+        self._key.save_pub_key(filename)
+        self._pubkey = EC.load_pub_key(filename)
+        os.remove(filename)
 class certificate(object):
     def __init__():
         pass
