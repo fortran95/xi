@@ -32,10 +32,21 @@ from M2Crypto import EC,RSA
 def tempfilename():
     return hashlib.md5(str(uuid.uuid3(uuid.uuid1(),str(uuid.uuid4())))).hexdigest()
 class _RSA(object):
+    _key = None
+    _pubkey = None
     def __init__(self):
         pass
     def generate(self,**argv):
-        pass
+        if argv.has_key('bits'):
+            bits = argv['bits']
+        else:
+            bits = 4096
+        if bits < 1024:
+            raise Exception("Cannot accept such bits < 1024.")
+        print "Generating a %d bits RSA key, please wait." % bits
+        self._key = RSA.gen_key(bits,65537)
+        print "RSA key generation done."
+        self._derive_pubkey()
     def sign(self,digest):
         pass
     def verify(self,digest,sign):
@@ -49,9 +60,41 @@ class _RSA(object):
     def load_privatekey(self,privatekey):
         pass
     def get_publickey(self):
-        pass
+        if self._pubkey == None:
+            return False
+        # Retrive pubkey data
+        filename = tempfilename()
+        self._pubkey.save_pub_key(filename)
+        pubkeydata = open(filename).read()
+        os.remove(filename)
+        # Write down a good form of public key.
+        pkinfo = {
+                'type'  :'RSA_Public_Key',
+                'data'  :pubkeydata.encode('base64')
+            }
+        return json.dumps(pkinfo,indent=4)
     def get_privatekey(self):
-        pass
+        if self._key == None:
+            return False
+        # Retrive privatekey data
+        filename = tempfilename()
+        self._key.save_key(filename,None)
+        prvkeydata = open(filename).read()
+        os.remove(filename)
+        # Write down a good form of public key.
+        pkinfo = {
+                'type'  :'RSA_Private_Key',
+                'data'  :prvkeydata.encode('base64')
+            }
+        return json.dumps(pkinfo,indent=4)
+    def _derive_pubkey(self):
+        # derive EC public key instance from self._key
+        if self._key == None:
+            return False
+        filename = tempfilename()
+        self._key.save_pub_key(filename)
+        self._pubkey = RSA.load_pub_key(filename)
+        os.remove(filename)
 class _EC(object):
     _curves_name = {
         707:'NID_secp128r2',
@@ -377,25 +420,11 @@ class certificate(object):
 if __name__ == "__main__":
     ec = _EC()
     ec.generate()
+    print ec.get_privatekey()
     def encryptor(message,key):
         print "[%s] encrypted using key [%s](%d bits)." % (message,key.encode('hex'),len(key) * 8)
         return message.encode('hex')
     def decryptor(message,key):
         print "[%s] decrypted using key [%s]." % (message,key.encode('hex'))
         return message.decode('hex')
-    #cp = ec.encrypt('message',encryptor)
-    eck = ec.get_privatekey()
-    
-    ec1 = _EC()
-    ec1.load_privatekey(eck)
-    
-    pk = ec1.get_publickey()
-    
-    ec2 = _EC()
-    ec2.load_publickey(pk)
-    
-    encrypted = ec2.encrypt('message, here.',encryptor)
-    decrypted = ec1.decrypt(encrypted,decryptor)
-    
-    print decrypted
     
