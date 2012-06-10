@@ -27,8 +27,10 @@
         签名日期
         有效日期
 """
-import random,time,os,base64
+import random,time,os,json,uuid,hashlib
 from M2Crypto import EC,RSA
+def tempfilename():
+    return hashlib.md5(str(uuid.uuid3(uuid.uuid1(),str(uuid.uuid4())))).hexdigest()
 class _EC(object):
     _curves_name = {
         707:'NID_secp128r2',
@@ -191,13 +193,13 @@ class _EC(object):
         # sign the given DIGEST. Output was base64-encoded.
         if self._key == None:
             return False
-        return base64.encodestring(self._key.sign_dsa_asn1(digest))
+        return self._key.sign_dsa_asn1(digest).encode('base64')
     def verify(self,digest,sign):
         # verify the DIGEST with given SIGN.
         if self._pubkey == None:
             return False
         try:
-            sign = base64.decodestring(sign) # in sign we set output being base64-encoded.
+            sign = sign.decode('base64') # in sign we set output being base64-encoded.
             if self._pubkey.verify_dsa_asn1(digest,sign):
                 return True
         except Exception,e:
@@ -213,22 +215,123 @@ class _EC(object):
         # Encrypt
         ciphertext = encryptor(message,sharedsecret)
         # Get tempkey's public key.
-        filename = 'temp' + str(int(random.random()))
+        filename = tempfilename()
         tempkey.save_pub_key(filename)
         publickey = open(filename).read()
         os.remove(filename)
-        return (publickey,ciphertext)
-    def decrypt(self,publickey,ciphertext):
-        pass
-    def load_from_publickey(self,publickey):
-        pass
-    def load_from_privatekey(self,privatekey):
-        pass
+        # Return with json.
+        publickey = publickey.encode('base64')
+        ret = json.dumps({'public_key':publickey,'ciphertext':ciphertext})
+        return ret
+    def decrypt(self,ciphertext,decryptor):
+        if self._key == None:
+            return False
+        try:
+            j = json.loads(ciphertext)
+            publickey = j['public_key'].decode('base64')
+            ciphertext= j['ciphertext']
+        except:
+            raise Exception("Bad ciphertext format.")
+        try:
+            # Read the temp. key. First write to a file.
+            filename = tempfilename()
+            open(filename,'w+').write(publickey)
+            tempkey = EC.load_pub_key(filename)
+            os.remove(filename)
+            # Combine this temp. key with our private key, and get Shared Secret.
+            sharedsecret = self._key.compute_dh_key(tempkey)
+        except Exception,e:
+            raise Exception("Unable to load public key. Error is [%s]." % e)
+        return decryptor(ciphertext,sharedsecret)
+    def load_publickey(self,publickey):
+        # Try parse the public key info.
+        try:
+            j = json.loads(publickey)
+            if j['type'] != 'EC_Public_Key':
+                raise Exception("This is not a public key thus cannot be loaded.")
+            if self._curves_id.has_key(j['curve']):
+                curve = self._curves_id[j['curve']]
+            else:
+                raise Exception("Unrecognized EC curve specified.")
+            pkdata = j['data'].decode('base64')
+        except Exception,e:
+            raise Exception("Failed loading publickey. Bad format. Error: %s" % e)
+        # If parsable, Write down and load.
+        try:
+            filename = tempfilename()
+            open(filename,'w+').write(pkdata)
+            self._pubkey = EC.load_pub_key(filename)
+            self._pubkey_curve = curve
+            os.remove(filename)
+        except Exception,e:
+            raise Exception("Cannot load public key.")
+        # Delete existing private key to avoid conflicts.
+        self._key = None
+        self._key_curve = None
+        # succeeded.
+        return True
+    def load_privatekey(self,privatekey):
+        # Try parse the private key info.
+        try:
+            j = json.loads(privatekey)
+            if j['type'] != 'EC_Private_Key':
+                raise Exception("This is not a private key thus cannot be loaded.")
+            if self._curves_id.has_key(j['curve']):
+                curve = self._curves_id[j['curve']]
+            else:
+                raise Exception("Unrecognized EC curve specified.")
+            pkdata = j['data'].decode('base64')
+        except Exception,e:
+            raise Exception("Failed loading privatekey. Bad format.")
+        # If parsable, Write down and load.
+        try:
+            filename = tempfilename()
+            open(filename,'w+').write(pkdata)
+            self._key = EC.load_key(filename)
+            self._key_curve = curve
+            os.remove(filename)
+        except Exception,e:
+            raise Exception("Cannot load private key. Error: %s" % e)
+        # Override existing public key.
+        self._pubkey_curve = curve
+        self._derive_pubkey()
+        # succeeded.
+        return True
+    def get_publickey(self):
+        if self._pubkey == None or self._pubkey_curve == None:
+            return False
+        # Retrive pubkey data
+        filename = tempfilename()
+        self._pubkey.save_pub_key(filename)
+        pubkeydata = open(filename).read()
+        os.remove(filename)
+        # Write down a good form of public key.
+        pkinfo = {
+                'type'  :'EC_Public_Key',
+                'curve' :self._curves_name[self._pubkey_curve],
+                'data'  :pubkeydata.encode('base64')
+            }
+        return json.dumps(pkinfo,indent=4)
+    def get_privatekey(self):
+        if self._key == None or self._key_curve == None:
+            return False
+        # Retrive privatekey data
+        filename = tempfilename()
+        self._key.save_key(filename,None)
+        prvkeydata = open(filename).read()
+        os.remove(filename)
+        # Write down a good form of public key.
+        pkinfo = {
+                'type'  :'EC_Private_Key',
+                'curve' :self._curves_name[self._key_curve],
+                'data'  :prvkeydata.encode('base64')
+            }
+        return json.dumps(pkinfo,indent=4)
     def _derive_pubkey(self):
         # derive EC public key instance from self._key
         if self._key == None:
             return False
-        filename = 'temp' + str(int(random.random()))
+        filename = tempfilename()
         self._key.save_pub_key(filename)
         self._pubkey = EC.load_pub_key(filename)
         os.remove(filename)
@@ -245,47 +348,25 @@ class certificate(object):
 if __name__ == "__main__":
     ec = _EC()
     ec.generate()
-    sign = ec.sign('000')
-    print sign
-    print ec.verify('000',sign)
-    exit()
-    from M2Crypto import EC
-    import os,base64
-    eckey1 = EC.gen_params(EC.NID_sect571r1)
-    eckey2 = EC.gen_params(EC.NID_sect571r1)
+    def encryptor(message,key):
+        print "[%s] encrypted using key [%s](%d bits)." % (message,key.encode('hex'),len(key) * 8)
+        return message.encode('hex')
+    def decryptor(message,key):
+        print "[%s] decrypted using key [%s]." % (message,key.encode('hex'))
+        return message.decode('hex')
+    #cp = ec.encrypt('message',encryptor)
+    eck = ec.get_privatekey()
     
-    eckey1.gen_key()
-    eckey2.gen_key()
+    ec1 = _EC()
+    ec1.load_privatekey(eck)
     
-    eckey1.save_pub_key('temp1')
-    eckey2.save_pub_key('temp2')
+    pk = ec1.get_publickey()
     
-    eckey1pub = EC.load_pub_key('temp1')
-    eckey2pub = EC.load_pub_key('temp2')
+    ec2 = _EC()
+    ec2.load_publickey(pk)
     
+    encrypted = ec2.encrypt('message, here.',encryptor)
+    decrypted = ec1.decrypt(encrypted,decryptor)
     
-    #print dir(eckey1pub.ec)
-    #exit()
+    print decrypted
     
-    # demostrate 2 send to 1
-    
-    ss1 = eckey1.compute_dh_key(eckey2pub)
-    ss2 = eckey2.compute_dh_key(eckey1pub)
-    
-    # eckey2 is a temp key. eckey1pub is always available.
-    # ss2->encrypt
-    
-    
-    #print base64.encodestring(ss1)
-    #print base64.encodestring(ss2)
-    
-    msgdigest = '000'
-    signature = eckey1.sign_dsa_asn1(msgdigest).encode('hex') # Sign Using a key derived from Private Parameters
-    print "The signature is: %s" % signature
-    print "Length of signature is: %d" % len(signature)
-    
-    print "Now verify."
-    print eckey1pub.verify_dsa_asn1(msgdigest,signature.decode('hex'))
-    
-    os.remove('temp1')
-    os.remove('temp2')
