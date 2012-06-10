@@ -27,7 +27,7 @@
         签名日期
         有效日期
 """
-import random,time,os
+import random,time,os,base64
 from M2Crypto import EC,RSA
 class _EC(object):
     _curves_name = {
@@ -166,6 +166,8 @@ class _EC(object):
     }
     _key = None
     _pubkey = None
+    _key_curve = None
+    _pubkey_curve = None
     def __init__(self):
         pass
     def generate(self,**argv):
@@ -182,8 +184,46 @@ class _EC(object):
         self._key = EC.gen_params(curve)
         self._key.gen_key()
         self._derive_pubkey()
+        self._key_curve, self._pubkey_curve = curve,curve
         
         print "Generated new EC key basing on %s." % curve_name
+    def sign(self,digest):
+        # sign the given DIGEST. Output was base64-encoded.
+        if self._key == None:
+            return False
+        return base64.encodestring(self._key.sign_dsa_asn1(digest))
+    def verify(self,digest,sign):
+        # verify the DIGEST with given SIGN.
+        if self._pubkey == None:
+            return False
+        try:
+            sign = base64.decodestring(sign) # in sign we set output being base64-encoded.
+            if self._pubkey.verify_dsa_asn1(digest,sign):
+                return True
+        except Exception,e:
+            print "Failed verifying signature: %s" % e
+        return False
+    def encrypt(self,message,encryptor):
+        if self._pubkey == None or self._pubkey_curve == None: # To send message via PublicKey, We must know it's curve.
+            return False
+        # Get a temp. key
+        tempkey = EC.gen_params(self._pubkey_curve)
+        tempkey.gen_key()
+        sharedsecret = tempkey.compute_dh_key(self._pubkey)
+        # Encrypt
+        ciphertext = encryptor(message,sharedsecret)
+        # Get tempkey's public key.
+        filename = 'temp' + str(int(random.random()))
+        tempkey.save_pub_key(filename)
+        publickey = open(filename).read()
+        os.remove(filename)
+        return (publickey,ciphertext)
+    def decrypt(self,publickey,ciphertext):
+        pass
+    def load_from_publickey(self,publickey):
+        pass
+    def load_from_privatekey(self,privatekey):
+        pass
     def _derive_pubkey(self):
         # derive EC public key instance from self._key
         if self._key == None:
@@ -205,6 +245,9 @@ class certificate(object):
 if __name__ == "__main__":
     ec = _EC()
     ec.generate()
+    sign = ec.sign('000')
+    print sign
+    print ec.verify('000',sign)
     exit()
     from M2Crypto import EC
     import os,base64
@@ -220,10 +263,18 @@ if __name__ == "__main__":
     eckey1pub = EC.load_pub_key('temp1')
     eckey2pub = EC.load_pub_key('temp2')
     
-    exit()
+    
+    #print dir(eckey1pub.ec)
+    #exit()
+    
+    # demostrate 2 send to 1
     
     ss1 = eckey1.compute_dh_key(eckey2pub)
     ss2 = eckey2.compute_dh_key(eckey1pub)
+    
+    # eckey2 is a temp key. eckey1pub is always available.
+    # ss2->encrypt
+    
     
     #print base64.encodestring(ss1)
     #print base64.encodestring(ss2)
