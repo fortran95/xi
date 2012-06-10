@@ -221,13 +221,21 @@ class _EC(object):
         os.remove(filename)
         # Return with json.
         publickey = publickey.encode('base64')
-        ret = json.dumps({'public_key':publickey,'ciphertext':ciphertext})
+        ret = json.dumps(
+            {
+                'type':'EC_Encrypted',
+                'public_key':publickey,
+                'ciphertext':ciphertext,
+            }
+        )
         return ret
     def decrypt(self,ciphertext,decryptor):
         if self._key == None:
             return False
         try:
             j = json.loads(ciphertext)
+            if j['type'] != 'EC_Encrypted':
+                raise Exception("Input may not be the intending ciphertext.")
             publickey = j['public_key'].decode('base64')
             ciphertext= j['ciphertext']
         except:
