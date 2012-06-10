@@ -31,6 +31,27 @@ import random,time,os,json,uuid,hashlib
 from M2Crypto import EC,RSA
 def tempfilename():
     return hashlib.md5(str(uuid.uuid3(uuid.uuid1(),str(uuid.uuid4())))).hexdigest()
+class _RSA(object):
+    def __init__(self):
+        pass
+    def generate(self,**argv):
+        pass
+    def sign(self,digest):
+        pass
+    def verify(self,digest,sign):
+        pass
+    def encrypt(self,message,encryptor):
+        pass
+    def decrypt(self,ciphertext,decryptor):
+        pass
+    def load_publickey(self,publickey):
+        pass
+    def load_privatekey(self,privatekey):
+        pass
+    def get_publickey(self):
+        pass
+    def get_privatekey(self):
+        pass
 class _EC(object):
     _curves_name = {
         707:'NID_secp128r2',
