@@ -108,7 +108,7 @@ class _RSA(object):
         self._derive_pubkey()
         # succeeded.
         return True
-    def get_publickey(self):
+    def get_publickey(self,raw=False):
         if self._pubkey == None:
             return False
         # Retrive pubkey data
@@ -121,8 +121,10 @@ class _RSA(object):
                 'type'  :'RSA_Public_Key',
                 'data'  :pubkeydata.encode('base64')
             }
+        if raw:
+            return pkinfo
         return json.dumps(pkinfo,indent=4)
-    def get_privatekey(self):
+    def get_privatekey(self,raw=False):
         if self._key == None:
             return False
         # Retrive privatekey data
@@ -135,6 +137,8 @@ class _RSA(object):
                 'type'  :'RSA_Private_Key',
                 'data'  :prvkeydata.encode('base64')
             }
+        if raw:
+            return pkinfo
         return json.dumps(pkinfo,indent=4)
     def _derive_pubkey(self):
         # derive EC public key instance from self._key
@@ -418,7 +422,7 @@ class _EC(object):
         self._derive_pubkey()
         # succeeded.
         return True
-    def get_publickey(self):
+    def get_publickey(self,raw=False):
         if self._pubkey == None or self._pubkey_curve == None:
             return False
         # Retrive pubkey data
@@ -432,8 +436,10 @@ class _EC(object):
                 'curve' :self._curves_name[self._pubkey_curve],
                 'data'  :pubkeydata.encode('base64')
             }
+        if raw:
+            return pkinfo
         return json.dumps(pkinfo,indent=4)
-    def get_privatekey(self):
+    def get_privatekey(self,raw=False):
         if self._key == None or self._key_curve == None:
             return False
         # Retrive privatekey data
@@ -447,6 +453,8 @@ class _EC(object):
                 'curve' :self._curves_name[self._key_curve],
                 'data'  :prvkeydata.encode('base64')
             }
+        if raw:
+            return pkinfo
         return json.dumps(pkinfo,indent=4)
     def _derive_pubkey(self):
         # derive EC public key instance from self._key
