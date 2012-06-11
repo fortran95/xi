@@ -48,17 +48,95 @@ class _RSA(object):
         print "RSA key generation done."
         self._derive_pubkey()
     def sign(self,digest):
-        pass
+        if self._key == None:
+            return False
+        encrypted = self._key.private_encrypt(digest,1)
+        return encrypted
     def verify(self,digest,sign):
-        pass
+        if self._pubkey == None:
+            return False
+        try:
+            decrypted = self._pubkey.public_decrypt(sign,1)
+            if decrypted == digest:
+                return True
+        except Exception,e:
+            pass
+        return False
     def encrypt(self,message,encryptor):
-        pass
+        if self._pubkey == None:
+            return False
+        # Generate a temp key and encrypt it using RSA.
+        tempkey = ''
+        for i in range(0,86):
+            tempkey += chr(random.randint(0,255))
+        # encrypt the message using tempkey.
+        data = encryptor(message,tempkey)
+        keyinfo = self._pubkey.public_encrypt(tempkey,4)
+        # Write out.
+        ret = {
+               'type':'RSA_Encrypted',
+               'tkey':keyinfo.encode('base64'),
+               'ciphertext':data.encode('base64'),
+            }
+        return json.dumps(ret,indent=4)
     def decrypt(self,ciphertext,decryptor):
-        pass
+        if self._key == None:
+            return False
+        try:
+            j = json.loads(ciphertext)
+            if j['type'] != 'RSA_Encrypted':
+                raise Exception("Input may not be the intending ciphertext.")
+            tempkey = j['tkey'].decode('base64')
+            ciphertext= j['ciphertext'].decode('base64')
+        except:
+            raise Exception("Bad ciphertext format.")
+        try:
+            tempkey = self._key.private_decrypt(tempkey,4)
+        except Exception,e:
+            raise Exception("Unable to decrypt this RSA ciphertext: %s" % e)
+        return decryptor(ciphertext,tempkey)
     def load_publickey(self,publickey):
-        pass
+        # Try parse the public key info.
+        try:
+            j = json.loads(publickey)
+            if j['type'] != 'RSA_Public_Key':
+                raise Exception("This is not a public key thus cannot be loaded.")
+            pkdata = j['data'].decode('base64')
+        except Exception,e:
+            raise Exception("Failed loading publickey. Bad format. Error: %s" % e)
+        # If parsable, Write down and load.
+        try:
+            filename = tempfilename()
+            open(filename,'w+').write(pkdata)
+            self._pubkey = RSA.load_pub_key(filename)
+            os.remove(filename)
+        except Exception,e:
+            raise Exception("Cannot load public key.")
+        # Delete existing private key to avoid conflicts.
+        self._key = None
+        # succeeded.
+        return True
     def load_privatekey(self,privatekey):
-        pass
+        # Try parse the private key info.
+        try:
+            j = json.loads(privatekey)
+            if j['type'] != 'RSA_Private_Key':
+                raise Exception("This is not a private key thus cannot be loaded.")
+            pkdata = j['data'].decode('base64')
+        except Exception,e:
+            raise Exception("Failed loading privatekey. Bad format.")
+        # If parsable, Write down and load.
+        try:
+            filename = tempfilename()
+            open(filename,'w+').write(pkdata)
+            self._key = RSA.load_key(filename)
+            os.remove(filename)
+        except Exception,e:
+            raise Exception("Cannot load private key. Error: %s" % e)
+        # Override existing public key.
+        self._derive_pubkey()
+        # succeeded.
+        return True
     def get_publickey(self):
         if self._pubkey == None:
             return False
@@ -418,9 +496,20 @@ class certificate(object):
         pass
     
 if __name__ == "__main__":
-    ec = _EC()
-    ec.generate()
-    print ec.get_privatekey()
+    rsa1 = _RSA()
+    rsa1.generate(bits=1024)
+    
+    rsa2 = _RSA()
+    rsa2.generate(bits=1024)
+    
+    rsa1pub = _RSA()
+    rsa2pub = _RSA()
+    
+    rsa1pub.load_publickey(rsa1.get_publickey())
+    rsa2pub.load_publickey(rsa2.get_publickey())
+    
+    digest = '000'
+    
     def encryptor(message,key):
         print "[%s] encrypted using key [%s](%d bits)." % (message,key.encode('hex'),len(key) * 8)
         return message.encode('hex')
@@ -428,3 +517,7 @@ if __name__ == "__main__":
         print "[%s] decrypted using key [%s]." % (message,key.encode('hex'))
         return message.decode('hex')
     
+    message = 'dksfjakdsfjkasfsla;fdaslj'
+    enc = rsa1pub.encrypt(message,encryptor)
+    dec = rsa2.decrypt(enc,decryptor)
+    print dec
