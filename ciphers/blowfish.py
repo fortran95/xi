@@ -52,6 +52,9 @@ import struct, types
 
 __author__ = "Michael Gilfix <mgilfix@eecs.tufts.edu>"
 
+key_size = 32
+block_size = 8
+
 class Blowfish:
 
     """Blowfish encryption Scheme
