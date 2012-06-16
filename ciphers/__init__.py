@@ -53,34 +53,53 @@ class mode_cbc(object):
         iv = ''
         for i in range(0,self.blocksize):
             iv += chr(random.randint(0,255))
+
         result = [iv,]
+        cbc_mac = '\x00' * self.blocksize
         
         lastblock = iv
         for block in blocks:
             cblock = self.cipher.encrypt(block)
             nblock = self._block_xor(lastblock, cblock)
+
+            cbc_mac = self.cipher.encrypt(self._block_xor(cbc_mac, block))
+
             lastblock = nblock
             result.append(nblock)
-        
+
+        result.append(cbc_mac) # APPEND the CBC_MAC value.
+
         return "".join(result)
 
     def decrypt(self,data):
+        if data == False:
+            return False
         
         datalen = len(data)
         if datalen % self.blocksize != 0:
             raise Exception("Invalid ciphertext input.")
 
         blocks = struct.unpack(self.splitcmd * (datalen / self.blocksize), data)
+        blocks_max_index = len(blocks) - 1
         iv = blocks[0]
-        blocks = blocks[1:]
+        cbc_mac = blocks[blocks_max_index]
+
+        blocks = blocks[1:blocks_max_index]
         result = []
 
         lastblock = iv
+        cbc_mac2 = '\x00' * self.blocksize
+
         for i in range(0,len(blocks)):
             nblock = blocks[i]
-            result.append(self.cipher.decrypt(self._block_xor(lastblock,blocks[i])))
+            cblock = self.cipher.decrypt(self._block_xor(lastblock,blocks[i]))
+            cbc_mac2 = self.cipher.encrypt(self._block_xor(cbc_mac2, cblock))
+            result.append(cblock)
             lastblock = nblock
 #            result.append(self.cipher.decrypt(blocks[i]))
+        if cbc_mac2 != cbc_mac:
+            print "Because of a CBC_MAC integrity check failure, decryption cancelled."
+            return False    # Data corrupted.
 
         return self.padder.depad("".join(result))
 
@@ -109,7 +128,9 @@ class mode_ecb(object):
         return "".join(result)
 
     def decrypt(self,data):
-        
+        if data == False:
+            return False
+
         datalen = len(data)
         if datalen % self.blocksize != 0:
             raise Exception("Invalid ciphertext input.")
@@ -174,17 +195,19 @@ if __name__ == "__main__":
     import time
     start = time.time()
     times = 1
-    for i in range(0,times):
-        enc = xi.encrypt(text)
+#    for i in range(0,times):
+    enc = xi.encrypt(text)
 
-        print len(enc)
+#    enc = enc[0:10] + 'a' + enc[11:]
+
+    print len(enc)
 #    print enc.encode('base64')
 #    print "Encrypted length = %d." % len(enc)
-        dec = xi.decrypt(enc)
+    dec = xi.decrypt(enc)
 #    print dec
 #    print len(dec)
-        if dec != text:
-            raise Exception("Error decrypting.")
+    if dec != text:
+        raise Exception("Error decrypting.")
     stop = time.time()
 
     print "Time cost: %f" % (stop - start)

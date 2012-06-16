@@ -26,8 +26,9 @@
         签名日期
         有效日期
 """
-import random,time,os,json,uuid,hashlib
+import random,time,os,json,uuid
 import publickeyalgo
+from hashes import Hash
 
 def hashable_json(input):
     return json.dumps(input,sort_keys=True,indent=0,ensure_ascii=True).strip()
@@ -93,15 +94,19 @@ class certificate(object):
             'Finger_Print':[
                     {
                         'Algorithm': 'SHA512',
-                        'Hash': hashlib.sha512(hash_source).digest().encode('base64')
+                        'Hash': Hash('sha512',hash_source).digest().encode('base64')
                     },
                     {
                         'Algorithm': 'MD5',
-                        'Hash': hashlib.md5(hash_source).digest().encode('base64')
+                        'Hash': Hash('md5',hash_source).digest().encode('base64')
                     },
                     {
                         'Algorithm': 'SHA1',
-                        'Hash': hashlib.sha1(hash_source).digest().encode('base64')
+                        'Hash': Hash('sha1',hash_source).digest().encode('base64')
+                    },
+                    {
+                        'Algorithm': 'WHIRLPOOL',
+                        'Hash': Hash('whirlpool',hash_source).digest().encode('base64')
                     },
                 ],
             'Signatures':{}

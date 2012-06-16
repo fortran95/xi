@@ -1,7 +1,7 @@
 import hashlib
 import whirlpool
 
-class hash(object):
+class Hash(object):
     _digest = None
     _hexdigest = None
     _providers = {
