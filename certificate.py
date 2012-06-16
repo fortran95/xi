@@ -41,7 +41,7 @@ class certificate(object):
     def __init__(self):
         pass
     def generate(self,subject,**argv):
-        # Will generate a new certificate. Compatiable to NERV-XI-001 Standard.
+        # Will generate a new certificate. Compatiable with NERV-XI-001 Standard.
         
         # - subject
         subject = subject.strip()
@@ -106,8 +106,18 @@ class certificate(object):
                 ],
             'Signatures':{}
             }
-        
+        # return
         return json.dumps(j,indent=2,sort_keys=True)
+    def load_public_certificate(self,text):
+        try:
+            j = json.loads(text)
+            # Read subject
+            basic = j['Basic']
+            
+        except Exception,e:
+            raise Exception("Certificate format is bad.")
+
+
 if __name__ == "__main__":
     cert = certificate()
     cert.generate('NERV',bits=1024)
