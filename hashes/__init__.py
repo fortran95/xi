@@ -11,15 +11,19 @@ class Hash(object):
         "sha512"    : [hashlib.sha512,         128], # verified
         "md5"       : [hashlib.md5,             64], # verified 
     }
-    def __init__(self,algo,data):
-        algo = algo.lower().strip()
-        if self._providers.has_key(algo):
-            self._algo = self._providers[algo]
-            self._digest = self._algo[0](data).digest()
-            self._hexdigest = self._digest.encode('hex')
-            self._data = data
-        else:
-            raise Exception("Unrecognized hash algorithm.")
+    def __init__(self,algo=None,data=None):
+        if algo != None and data != None:
+            algo = algo.lower().strip()
+            if self._providers.has_key(algo):
+                self._algo = self._providers[algo]
+                self._digest = self._algo[0](data).digest()
+                self._hexdigest = self._digest.encode('hex')
+                self._data = data
+            else:
+                raise Exception("Unrecognized hash algorithm.")
+    def recognizes(self,algoname):
+        algoname = algoname.lower().strip()
+        return self._providers.has_key(algoname)
     def digest(self):
         return self._digest
     def hexdigest(self):

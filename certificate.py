@@ -90,6 +90,7 @@ class certificate(object):
         # format json.
         hash_source = hashable_json(baseinfo)
         j = {
+            'Title':'Xi_Certificate',
             'Basic':baseinfo,
             'Finger_Print':[
                     {
@@ -116,15 +117,74 @@ class certificate(object):
     def load_public_certificate(self,text):
         try:
             j = json.loads(text)
-            # Read subject
+            if j['Title'] != 'Xi_Certificate':
+                raise Exception("Seems not a Xi Project Certificate.")
+
+            # Read subject, version and others
+
             basic = j['Basic']
-            
+            basic_version = basic['Version']
+            basic_subject = basic['Subject']
+            basic_public_key_ring = basic['Public_Key_Ring']
+
+            fingerprint = j['Finger_Print']
+
+            # Try to load public keys
+
+            basic_pubkey_sensible = True
+            eckey = publickeyalgo._EC()
+            rsakey = publickeyalgo._RSA()
+            try:
+                for key in basic_public_key_ring:
+
+                    pubkey = basic_public_key_ring[key]
+
+                    if pubkey['type'] == 'EC_Public_Key':
+                        ret = eckey.load_publickey(json.dumps(pubkey))
+                    elif pubkey['type'] == 'RSA_Public_Key':
+                        ret = rsakey.load_publickey(json.dumps(pubkey))
+                    basic_pubkey_sensible = basic_pubkey_sensible and ret
+            except Exception,e:
+                print "Error occured: %s" % e
+                basic_pubkey_sensible = False
+            if not basic_pubkey_sensible:
+                raise Exception("This ceritificate's public key info is non-sense.")
+            if not ( eckey._pubkey != None and rsakey._pubkey != None ):
+                raise Exception("This certificate has insufficient public key info.")
+
+            # Verify Integrity
+
+            hash_source = hashable_json(basic)
+            hash_recognized = False
+            for fpinfo in fingerprint:
+                if Hash().recognizes(fpinfo['Algorithm']):
+                    hash_recognized = True
+                    calchash = Hash(fpinfo['Algorithm'],hash_source).digest().encode('base64')
+                    if calchash != fpinfo['Hash']:
+                        raise Exception("Certificate has invalid hash, cannot verify its INTERGRITY.")
+            if not hash_recognized:
+                raise Exception("Cannot verify INTERGRITY of this certificate.")
+
+            # TODO check signatures, consult reliability.
+
+            # Now load this certificate.
+
+            self.is_ours = False
+            self.keys = [eckey, rsakey]
+            self.subject = basic_subject
+
+            print "Certificate verified and loaded."
+            return True
+                        
         except Exception,e:
-            raise Exception("Certificate format is bad.")
+            raise Exception("Certificate format is bad: %s" % e)
 
 
 if __name__ == "__main__":
     cert = certificate()
     cert.generate('NERV',bits=1024)
     print "-" * 80
-    print cert.get_public_text()
+    certtext = cert.get_public_text()
+
+    cert2 = certificate()
+    cert2.load_public_certificate(certtext)
