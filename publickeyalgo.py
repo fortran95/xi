@@ -464,3 +464,6 @@ class _EC(object):
         self._key.save_pub_key(filename)
         self._pubkey = EC.load_pub_key(filename)
         os.remove(filename)
+
+if __name__ == "__main__":
+    pass
