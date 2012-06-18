@@ -19,7 +19,7 @@
     HMAC-KEY
     签名者的证书ID
     签名日期
-    有效日期
+    有效日期（证书的有效期由上级确定，没有签名的证书本身就是可疑的）
     签名用的HASH算法
     签名者的签名；对以下内容进行签名
         证书的指纹
@@ -70,7 +70,10 @@ class certificate(object):
         self.signatures = None
         
         # After generated, load this cert. into the instance.
-    
+
+    # TODO PRIVATE CERTIFICATE I/O!
+    # XXX  证书如果没有签名，就是可疑的。
+
     def get_public_text(self):
         # This will generate a publishable certificate text.
         # - subject

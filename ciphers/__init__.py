@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import struct,random,zlib
-import blowfish, rijndael, twofish, serpent
+import blowfish, rijndael, twofish, serpent, xxtea
 
 class padding(object):
     def __init__(self,blocksize):
@@ -114,8 +114,6 @@ class mode_ecb(object):
 
     def encrypt(self,data):
 
-        data = zlib.compress(data)
-
         data = self.padder.enpad(data)
         datalen = len(data)
         
@@ -133,7 +131,7 @@ class mode_ecb(object):
 
         datalen = len(data)
         if datalen % self.blocksize != 0:
-            raise Exception("Invalid ciphertext input.")
+            raise Exception("Invalid ciphertext input. Data length: %d" % datalen)
 
         blocks = struct.unpack(self.splitcmd * (datalen / self.blocksize), data)
         result = []
@@ -141,22 +139,31 @@ class mode_ecb(object):
         for block in blocks:
             result.append(self.cipher.decrypt(block))
 
-        return zlib.decompress(self.padder.depad("".join(result)))
+        return self.padder.depad("".join(result))
 
 class xipher(object):
 
     cipherlist = [
-        [serpent.Serpent,   serpent.key_size,  serpent.block_size,  mode_ecb],
-        [twofish.Twofish,   twofish.key_size,  twofish.block_size,  mode_ecb],
-        [rijndael.Rijndael, rijndael.key_size, rijndael.block_size, mode_ecb],
-        [blowfish.Blowfish, blowfish.key_size, blowfish.block_size, mode_cbc],
+        [serpent.Serpent,   serpent.key_size,  serpent.block_size],
+        [twofish.Twofish,   twofish.key_size,  twofish.block_size],
+        [rijndael.Rijndael, rijndael.key_size, rijndael.block_size],
+        [blowfish.Blowfish, blowfish.key_size, blowfish.block_size],
     ]
+    def package(self, data, enpack=True):
+        if len(self.packagekey) != xxtea.key_size:
+            raise Exception("This packager requires a package key of %d bytes." % xxtea.key_size)
+        tool = mode_cbc(xxtea.XXTEA(self.packagekey), xxtea.block_size)
+        if enpack:
+            return tool.encrypt(data)
+        else:
+            return tool.decrypt(data)
+
     encrypt_chain = []
 
     def get_version(self):
         return 1
 
-    def __init__(self, key):
+    def __init__(self, key, packagekey=None):
 
         keylen = 0
         for x in self.cipherlist:
@@ -165,22 +172,52 @@ class xipher(object):
         if len(key) < keylen:
             raise Exception("Key too short. At least %d bytes required." % keylen)
         
-        for x in self.cipherlist:
-            cipher = x[0](key[0:x[1]])
-            key = key[x[1]:]
-            tool = x[3](cipher, x[2])
-            self.encrypt_chain.append(tool)
+        shifting_list = self.cipherlist[:]
+        for i in range(0,len(self.cipherlist)):
+            keyring = key[:]
+            for x in shifting_list:
+                cipher = x[0](keyring[0:x[1]])
+                keyring = keyring[x[1]:]
+                tool = mode_ecb(cipher, x[2])
+                self.encrypt_chain.append(tool)
+            shifting_first = shifting_list[0]
+            shifting_list = shifting_list[1:]
+            shifting_list.append(shifting_first)
 
         self.decrypt_chain = self.encrypt_chain[:]
         self.decrypt_chain.reverse()
 
+        if packagekey == None:
+            import hashlib
+            self.packagekey = hashlib.md5(key).digest()
+        else:
+            self.packagekey = packagekey
+
     def encrypt(self, data):
+        package_ctl = 0
+        # Decide if use zlib
+        compressed = zlib.compress(data,9)
+        if len(compressed) / len(data) < 0.75:
+            data = compressed.encode('base64')
+            package_ctl += 1
+
+        data = chr(package_ctl) + data
         for tool in self.encrypt_chain:
             data = tool.encrypt(data)
-        return data
+        
+        return self.package(data)
     def decrypt(self, data):
+        data = self.package(data,False)
+
         for tool in self.decrypt_chain:
+#            print "data length: %d" % len(data)
             data = tool.decrypt(data)
+
+        package_ctl = ord(data[0])
+        data = data[1:]
+
+        if package_ctl & 0x01:
+            data = zlib.decompress(data.decode('base64'))
         return data
 
     def get_version(self):
@@ -189,9 +226,9 @@ class xipher(object):
 
 if __name__ == "__main__":
     key = "dsjkfajksdjflkasjfkjks" * 16
-    text = open("blowfish.py").read() + open("rijndael.py").read()
+    text = open("rijndael.py").read()# + open("rijndael.py").read()"""
     xi = xipher(key)
-    print len(text)
+#    print len(text)
     import time
     start = time.time()
     times = 1
@@ -199,16 +236,16 @@ if __name__ == "__main__":
     enc = xi.encrypt(text)
 
 #    enc = enc[0:10] + 'a' + enc[11:]
-
-    print len(enc)
+    print "Plaintext Length:  %d" % len(text)
+    print "Ciphertext Length: %d" % len(enc)
 #    print enc.encode('base64')
 #    print "Encrypted length = %d." % len(enc)
     dec = xi.decrypt(enc)
 #    print dec
-#    print len(dec)
+    print len(dec)
     if dec != text:
         raise Exception("Error decrypting.")
     stop = time.time()
 
     print "Time cost: %f" % (stop - start)
-    print "Average speed: %f Bytes/s." % (len(text) * times / (stop - start))
+    print "Average speed: %f Bytes/s." % (len(text) * times * 2 / (stop - start))
