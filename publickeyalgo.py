@@ -2,6 +2,54 @@ import random,time,os,json,uuid,hashlib
 from M2Crypto import EC,RSA
 def tempfilename():
     return hashlib.md5(str(uuid.uuid3(uuid.uuid1(),str(uuid.uuid4())))).hexdigest()
+
+class PublicKeyAlgorithm(object):
+    # Generic Loader of Public Keys.
+    is_private_key = None
+
+    def __init__(self,keystr):
+        try:
+            j = json.loads(keystr)
+            if j['type'] == 'RSA_Public_Key':
+                self.key = _RSA()
+                self.is_private_key = False
+            elif j['type'] == 'EC_Public_Key':
+                self.key = _EC()
+                self.is_private_key = False
+            elif j['type'] == 'RSA_Private_Key':
+                self.key = _RSA()
+                self.is_private_key = True
+            elif j['type'] == 'EC_Private_Key':
+                self.key = _EC()
+                self.is_private_key = True
+            else:
+                raise Exception("Unrecognized type of public key.")
+
+            if self.is_private_key:
+                self.key.load_privatekey(keystr)
+            else:
+                self.key.load_publickey(keystr)
+        except:
+            pass
+
+    def get_publickey(self,raw=False):
+        return self.key.get_publickey(raw)
+
+    def get_privatekey(self,raw=False):
+        return self.key.get_privatekey(raw)
+
+    def sign(self,digest):
+        return self.key.sign(digest)
+
+    def verify(self,digest,sign):
+        return self.key.verify(digest,sign)
+
+    def encrypt(self,message,encryptor):
+        return self.key.encrypt(message,encryptor)
+
+    def decrypt(self,ciphertext,decryptor):
+        return self.key.decrypt(ciphertext,decryptor)
+
 class _RSA(object):
     _key = None
     _pubkey = None
