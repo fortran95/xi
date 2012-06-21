@@ -147,12 +147,13 @@ class xipher(object):
         [serpent.Serpent,   serpent.key_size,  serpent.block_size],
         [twofish.Twofish,   twofish.key_size,  twofish.block_size],
         [rijndael.Rijndael, rijndael.key_size, rijndael.block_size],
+#        [xxtea.XXTEA,       xxtea.key_size,    xxtea.block_size],
         [blowfish.Blowfish, blowfish.key_size, blowfish.block_size],
     ]
     def package(self, data, enpack=True):
-        if len(self.packagekey) != xxtea.key_size:
-            raise Exception("This packager requires a package key of %d bytes." % xxtea.key_size)
-        tool = mode_cbc(xxtea.XXTEA(self.packagekey), xxtea.block_size)
+        if len(self.packagekey) != rijndael.key_size:
+            raise Exception("This packager requires a package key of %d bytes." % rijndael.key_size)
+        tool = mode_cbc(rijndael.Rijndael(self.packagekey), rijndael.block_size)
         if enpack:
             return tool.encrypt(data)
         else:
@@ -189,7 +190,7 @@ class xipher(object):
 
         if packagekey == None:
             import hashlib
-            self.packagekey = hashlib.md5(key).digest()
+            self.packagekey = hashlib.sha256(key).digest()
         else:
             self.packagekey = packagekey
 

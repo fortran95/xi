@@ -71,8 +71,16 @@ class certificate(object):
         
         # After generated, load this cert. into the instance.
 
-    # TODO PRIVATE CERTIFICATE I/O!
-    # XXX  证书如果没有签名，就是可疑的。
+    # TODO 提供导出和导入私有证书的方法。
+    def save_private_text(self):
+        pass
+    def load_private_text(self):
+        pass
+
+    # TODO 提供使用证书进行加密和签署的方法。用于给证书持有者传递信息，以及让证书持有者自己签署信息。
+    
+    # XXX  证书如果没有签名，就是可疑的。提供签名和验证签名的方法。
+    #        签名信息应当被单独列入一个类，提供签名的产生、导出、验证等方法。验证签名需要相应的公钥证书。
 
     def get_public_text(self):
         # This will generate a publishable certificate text.
