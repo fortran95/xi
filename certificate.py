@@ -199,3 +199,6 @@ if __name__ == "__main__":
 
     cert2 = certificate()
     cert2.load_public_certificate(certtext)
+
+    print '* ' * 40
+    print certtext
