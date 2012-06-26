@@ -36,6 +36,7 @@ def hashable_json(input):
 class certificate(object):
     subject = None
     keys = None
+    signatures = None
     is_ours = False
     signatures = None
     
@@ -73,22 +74,39 @@ class certificate(object):
 
     # TODO 提供导出和导入私有证书的方法。
     def save_private_text(self,filename):
+        if not self.is_ours:
+            raise Exception("Trying to save private info of a public certificate.")
+
         savesh = shelve.open(filename,writeback=True)
         savesh.clear()
 
+        # save basic info
         savesh['Title']   = 'Xi_Ceritificate'
         savesh['Basic']   = {
-                "Public_key_Ring":{},
+                "Public_Key_Ring":{},
                 "Subject":self.subject,
                 "Version":'1',
             }
-        savesh['Finger_Print'] = {}
+       
+        # save self.keys
+        keyindex = 1
+        for k in self.keys:
+            keydata = k.get_privatekey(raw=True)
+            savesh['Basic']['Public_Key_Ring'][keyindex] = keydata
+            keyindex += 1
+
+        # save signatures
+        # TODO 
+
+        # final
+        savesh.sync()
+        savesh.close()
     def load_private_text(self,filename):
         pass
 
     # TODO 提供使用证书进行加密和签署的方法。用于给证书持有者传递信息，以及让证书持有者自己签署信息。
     # XXX  具体来说，需要提供：
-    #    XXX 用自己的私人证书产生给一个来自公共域的证书的签名信息
+    #    XXX 用自己的私人证书产生给一个来自公共域的证书的签名信息(此人给出信任等级)
     #    XXX 向一个（公有或者私有的）证书中插入来自外人的签名（验证并储存，然后可以通过get_public_text或者save_private_text储存
     
     # XXX  证书如果没有签名，就是可疑的。提供签名和验证签名的方法。
@@ -217,6 +235,8 @@ if __name__ == "__main__":
 
     cert2 = certificate()
     cert2.load_public_certificate(certtext)
+
+#    cert.save_private_text("testcert")
 
     print '* ' * 40
     print certtext
