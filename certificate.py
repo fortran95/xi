@@ -26,7 +26,7 @@
         签名日期
         有效日期
 """
-import random,time,os,json,uuid
+import random,time,os,json,uuid,shelve
 import publickeyalgo
 from hashes import Hash
 
@@ -72,12 +72,24 @@ class certificate(object):
         # After generated, load this cert. into the instance.
 
     # TODO 提供导出和导入私有证书的方法。
-    def save_private_text(self):
-        pass
-    def load_private_text(self):
+    def save_private_text(self,filename):
+        savesh = shelve.open(filename,writeback=True)
+        savesh.clear()
+
+        savesh['Title']   = 'Xi_Ceritificate'
+        savesh['Basic']   = {
+                "Public_key_Ring":{},
+                "Subject":self.subject,
+                "Version":'1',
+            }
+        savesh['Finger_Print'] = {}
+    def load_private_text(self,filename):
         pass
 
     # TODO 提供使用证书进行加密和签署的方法。用于给证书持有者传递信息，以及让证书持有者自己签署信息。
+    # XXX  具体来说，需要提供：
+    #    XXX 用自己的私人证书产生给一个来自公共域的证书的签名信息
+    #    XXX 向一个（公有或者私有的）证书中插入来自外人的签名（验证并储存，然后可以通过get_public_text或者save_private_text储存
     
     # XXX  证书如果没有签名，就是可疑的。提供签名和验证签名的方法。
     #        签名信息应当被单独列入一个类，提供签名的产生、导出、验证等方法。验证签名需要相应的公钥证书。
@@ -101,6 +113,7 @@ class certificate(object):
         # format json.
         hash_source = hashable_json(baseinfo)
         j = {
+            'ID'   :Hash('md5',hash_source).hexdigest(),
             'Title':'Xi_Certificate',
             'Basic':baseinfo,
             'Finger_Print':[
@@ -139,6 +152,7 @@ class certificate(object):
             basic_public_key_ring = basic['Public_Key_Ring']
 
             fingerprint = j['Finger_Print']
+            certid = j['ID']
 
             # Try to load public keys
 
@@ -175,6 +189,10 @@ class certificate(object):
                         raise Exception("Certificate has invalid hash, cannot verify its INTERGRITY.")
             if not hash_recognized:
                 raise Exception("Cannot verify INTERGRITY of this certificate.")
+
+            wanted_id = Hash('md5',hash_source).hexdigest()
+            if wanted_id != certid:
+                raise Exception("Certificate ID do not match its content.")
 
             # TODO check signatures, consult reliability.
 
