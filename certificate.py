@@ -81,7 +81,7 @@ class certificate(object):
         savesh.clear()
 
         # save basic info
-        savesh['Title']   = 'Xi_Ceritificate'
+        savesh['Title']   = 'Xi_Certificate_Private'
         savesh['Basic']   = {
                 "Public_Key_Ring":{},
                 "Subject":self.subject,
@@ -102,7 +102,57 @@ class certificate(object):
         savesh.sync()
         savesh.close()
     def load_private_text(self,filename):
-        pass
+        loadsh = shelve.open(filename)
+        try:
+            if loadsh['Title'] != 'Xi_Certificate_Private':
+                raise Exception("Seems not a Xi Project Certificate Private info.")
+
+            # Read subject, version and others
+
+            basic = loadsh['Basic']
+            basic_version = basic['Version']
+            basic_subject = basic['Subject']
+            basic_public_key_ring = basic['Public_Key_Ring']
+
+            certid = Hash('md5',hashable_json(basic)).hexdigest()
+
+            # Try to load public keys
+
+            basic_prvkey_sensible = True
+            eckey = publickeyalgo._EC()
+            rsakey = publickeyalgo._RSA()
+            try:
+                for key in basic_public_key_ring:
+
+                    prvkey = basic_public_key_ring[key]
+                    if prvkey['type'] == 'EC_Private_Key':
+                        ret = eckey.load_privatekey(json.dumps(prvkey))
+                    elif prvkey['type'] == 'RSA_Private_Key':
+                        ret = rsakey.load_privatekey(json.dumps(prvkey))
+                    basic_prvkey_sensible = basic_prvkey_sensible and ret
+
+            except Exception,e:
+                print "Error occured: %s" % e
+                basic_prvkey_sensible = False
+            if not basic_prvkey_sensible:
+                raise Exception("This ceritificate's private key info is non-sense.")
+            if not ( eckey._key != None and rsakey._key != None ):
+                raise Exception("This certificate has insufficient private key info.")
+
+            # TODO check signatures, consult reliability.
+
+            # Now load this certificate.
+
+            self.is_ours = True
+            self.keys = [eckey, rsakey]
+            self.subject = basic_subject
+
+            print "Certificate verified and loaded."
+            return True
+                        
+        except Exception,e:
+            raise Exception("Certificate format is bad: %s" % e)
+
 
     # TODO 提供使用证书进行加密和签署的方法。用于给证书持有者传递信息，以及让证书持有者自己签署信息。
     # XXX  具体来说，需要提供：
@@ -236,7 +286,12 @@ if __name__ == "__main__":
     cert2 = certificate()
     cert2.load_public_certificate(certtext)
 
-#    cert.save_private_text("testcert")
+    cert.save_private_text("testcert")
+
+    cert3 = certificate()
+    cert3.load_private_text("testcert")
+
+    certtext2 = cert3.get_public_text()
 
     print '* ' * 40
-    print certtext
+    print certtext == certtext2
