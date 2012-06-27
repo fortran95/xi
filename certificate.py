@@ -82,12 +82,7 @@ class certificate(object):
 
         # save basic info
         savesh['Title']   = 'Xi_Certificate_Private'
-        savesh['Basic']   = {
-                "Public_Key_Ring":{},
-                "Subject":self.subject,
-                "Version":'1',
-            }
-       
+        savesh['Basic']   = self.get_baseinfo()       
         # save self.keys
         keyindex = 1
         for k in self.keys:
@@ -161,11 +156,40 @@ class certificate(object):
     
     # XXX  证书如果没有签名，就是可疑的。提供签名和验证签名的方法。
     #        签名信息应当被单独列入一个类，提供签名的产生、导出、验证等方法。验证签名需要相应的公钥证书。
+    def do_sign(self,digest):
+        # 通用的签名方法
+        if not self.is_ours:
+            raise Exception("This is not a private certificate that can be used for signing.")
+        pass
+    def do_sign_a_certificate(self,pubcert,trustlevel=0,life=0x9E3400, cert_hashalgo='SHA256', sign_hashalgo='SHA256', raw=True): 
+        # 用本证书签署 pubcert， 信任等级默认为0，有效期120天，使用 do_sign 进行最终的签名
 
-    def get_public_text(self):
-        # This will generate a publishable certificate text.
-        # - subject
-        # - pubkeyring
+        nowtime = time.time() + time.timezone # XXX 注意检查确认为 UTC 时间
+        cert_hashalgo = 'SHA256'
+        sign_hashalgo = 'SHA256'
+
+        rawinfo = {
+            'Certified_ID'        : pubcert.get_id(),
+            'Issuer_ID'           : self.get_id(),
+            'Issue_UTC'           : int(nowtime),
+            'Valid_To'            : int(nowtime + life),
+            'Cert_Hash_Algorithm' : 'SHA256',
+            'Cert_Digest'         : pubcert.get_hash(cert_hashalgo)
+            'Sign_Hash_Algorithm' : 'SHA256',
+        }
+
+        sign_digest = Hash(sign_hashalgo,hashable_json(rawinfo)).digest().encode('base64')
+
+        signature = self.do_sign(sign_digest)
+
+        ret = {"Sign_Clear":rawinfo,"Signature":signature}
+
+        if raw:
+            return ret
+        else:
+            return json.dumps(ret)
+
+    def get_baseinfo(self):
         pubkeyring = {}
         keyindex = 1
         for k in self.keys:
@@ -177,29 +201,42 @@ class certificate(object):
                 'Subject': self.subject,
                 'Public_Key_Ring':pubkeyring,
             }
-        
+        return baseinfo
+    def get_id(self):
+        return Hash('md5',hashable_json(self.get_baseinfo())).hexdigest()
+    def get_hash(self,algo,b64=True):
+        if b64:
+            digest = Hash(algo,hashable_json(self.get_baseinfo())).digest().encode('base64')
+        else:
+            digest = Hash(algo,hashable_json(self.get_baseinfo())).hexdigest()
+        return digest
+    def get_public_text(self):
+        # This will generate a publishable certificate text.
+        # - subject
+        # - pubkeyring
+        baseinfo = self.get_baseinfo()        
         # format json.
         hash_source = hashable_json(baseinfo)
         j = {
-            'ID'   :Hash('md5',hash_source).hexdigest(),
+            'ID'   :self.get_baseinfo(),
             'Title':'Xi_Certificate',
             'Basic':baseinfo,
             'Finger_Print':[
                     {
                         'Algorithm': 'SHA512',
-                        'Hash': Hash('sha512',hash_source).digest().encode('base64')
+                        'Hash': self.get_hash('SHA512'),
                     },
                     {
                         'Algorithm': 'MD5',
-                        'Hash': Hash('md5',hash_source).digest().encode('base64')
+                        'Hash': self.get_hash('MD5'),
                     },
                     {
                         'Algorithm': 'SHA1',
-                        'Hash': Hash('sha1',hash_source).digest().encode('base64')
+                        'Hash': self.get_hash('SHA1'),
                     },
                     {
                         'Algorithm': 'WHIRLPOOL',
-                        'Hash': Hash('whirlpool',hash_source).digest().encode('base64')
+                        'Hash': self.get_hash('WHIRLPOOL'),
                     },
                 ],
             'Signatures':{}
