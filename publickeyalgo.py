@@ -1,4 +1,6 @@
-import random,time,os,json,uuid,hashlib
+# -*- coding: utf-8 -*-
+
+import random,time,os,json,uuid,hashlib,math
 from M2Crypto import EC,RSA
 def tempfilename():
     return hashlib.md5(str(uuid.uuid3(uuid.uuid1(),str(uuid.uuid4())))).hexdigest()
@@ -55,6 +57,8 @@ class _RSA(object):
     _pubkey = None
     def __init__(self):
         pass
+    def sign_limit(self):    # 返回支持加密的文本长度
+        return int(self.bits * 0.75 / 8)
     def generate(self,**argv):
         if argv.has_key('bits'):
             bits = argv['bits']
@@ -62,6 +66,7 @@ class _RSA(object):
             bits = 4096
         if bits < 1024:
             raise Exception("Cannot accept such bits < 1024.")
+        self.bits = bits
         print "Generating a %d bits RSA key, please wait." % bits
         self._key = RSA.gen_key(bits,65537)
         print "RSA key generation done."
@@ -86,7 +91,8 @@ class _RSA(object):
             return False
         # Generate a temp key and encrypt it using RSA.
         tempkey = ''
-        for i in range(0,86):
+        maxlen = int(self.bits * 0.75 / 8)
+        for i in range(0,maxlen):
             tempkey += chr(random.randint(0,255))
         # encrypt the message using tempkey.
         data = encryptor(message,tempkey)
@@ -121,6 +127,7 @@ class _RSA(object):
             if j['type'] != 'RSA_Public_Key':
                 raise Exception("This is not a public key thus cannot be loaded.")
             pkdata = j['data'].decode('base64')
+            self.bits = int(j['bits'])
         except Exception,e:
             raise Exception("Failed loading publickey. Bad format. Error: %s" % e)
         # If parsable, Write down and load.
@@ -142,6 +149,7 @@ class _RSA(object):
             if j['type'] != 'RSA_Private_Key':
                 raise Exception("This is not a private key thus cannot be loaded.")
             pkdata = j['data'].decode('base64')
+            self.bits = int(j['bits'])
         except Exception,e:
             raise Exception("Failed loading privatekey. Bad format.")
         # If parsable, Write down and load.
@@ -167,6 +175,7 @@ class _RSA(object):
         # Write down a good form of public key.
         pkinfo = {
                 'type'  :'RSA_Public_Key',
+                'bits'  :self.bits,
                 'data'  :pubkeydata.encode('base64')
             }
         if raw:
@@ -183,6 +192,7 @@ class _RSA(object):
         # Write down a good form of public key.
         pkinfo = {
                 'type'  :'RSA_Private_Key',
+                'bits'  :self.bits,
                 'data'  :prvkeydata.encode('base64')
             }
         if raw:
@@ -337,6 +347,23 @@ class _EC(object):
     _pubkey_curve = None
     def __init__(self):
         pass
+    def sign_limit(self):
+        if self._key != None:
+            curvename = self._key_curve
+        elif self._pubkey != None:
+            curvename = self._pubkey_curve
+        else:
+            raise Exception("Not initilized.")
+
+        curvename = self._curves_name[curvename]
+
+        if curvename[0:10] == 'NID_X9_62_':
+            return int(math.floor(int(curvename[15:18]) / 8.0))
+        elif curvename[0:7] == 'NID_sec':
+            return int(math.floor(int(curvename[8:11] ) / 8.0))
+        else:
+            return 10
+
     def generate(self,**argv):
         # select EC curve.
         if argv.has_key('curve'):
@@ -377,6 +404,10 @@ class _EC(object):
         tempkey = EC.gen_params(self._pubkey_curve)
         tempkey.gen_key()
         sharedsecret = tempkey.compute_dh_key(self._pubkey)
+        
+        # XXX TODO REMOVE THIS
+        print "Length of key is: %d" % (len(sharedsecret) * 8)
+
         # Encrypt
         ciphertext = encryptor(message,sharedsecret)
         # Get tempkey's public key.
@@ -514,4 +545,10 @@ class _EC(object):
         os.remove(filename)
 
 if __name__ == "__main__":
-    pass
+    r = _EC()
+    r.generate()
+    def encryptor(key,message):
+        return 'ok'
+    r.encrypt('a' * 1024, encryptor)
+    print "Sign limit: %d" % (r.sign_limit() * 8)
+    r.sign('a' * r.sign_limit())

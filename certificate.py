@@ -27,7 +27,7 @@
         有效日期
 """
 import random,time,os,json,uuid,shelve
-import publickeyalgo
+import publickeyalgo,signature
 from hashes import Hash
 
 def hashable_json(input):
@@ -38,7 +38,7 @@ class certificate(object):
     keys = None
     signatures = None
     is_ours = False
-    signatures = None
+    signatures = []
     
     def __init__(self):
         pass
@@ -160,8 +160,11 @@ class certificate(object):
         # 通用的签名方法
         if not self.is_ours:
             raise Exception("This is not a private certificate that can be used for signing.")
-        pass
-    def do_sign_a_certificate(self,pubcert,trustlevel=0,life=0x9E3400, cert_hashalgo='SHA256', sign_hashalgo='SHA256', raw=True): 
+        for key in self.keys:
+            signer = signature(json.dumps(key))
+            signer.new(digest,'SHA1')   # XXX 安全泄漏。应当考虑一种提供选择的方法
+        
+    def do_sign_a_certificate(self,pubcert,trustlevel=0,life=0x9E3400, cert_hashalgo='SHA256', sign_hashalgo='SHA256', raw=False): 
         # 用本证书签署 pubcert， 信任等级默认为0，有效期120天，使用 do_sign 进行最终的签名
 
         nowtime = time.time() + time.timezone # XXX 注意检查确认为 UTC 时间
@@ -169,12 +172,13 @@ class certificate(object):
         sign_hashalgo = 'SHA256'
 
         rawinfo = {
+            'Title'               : 'New_Signature',
             'Certified_ID'        : pubcert.get_id(),
             'Issuer_ID'           : self.get_id(),
             'Issue_UTC'           : int(nowtime),
             'Valid_To'            : int(nowtime + life),
             'Cert_Hash_Algorithm' : 'SHA256',
-            'Cert_Digest'         : pubcert.get_hash(cert_hashalgo)
+            'Cert_Digest'         : pubcert.get_hash(cert_hashalgo),
             'Sign_Hash_Algorithm' : 'SHA256',
         }
 
@@ -184,11 +188,18 @@ class certificate(object):
 
         ret = {"Sign_Clear":rawinfo,"Signature":signature}
 
+        # 将签名写入 pubcert
+        pubcert.signatures.append(ret)
+
         if raw:
             return ret
         else:
             return json.dumps(ret)
-
+    def revoke_signature(self,pubcert): # 提供产生对一个公域证书的撤回信息
+        pass
+    def load_a_cert_signature(self,signstr): # 对于私或公用证书均可，加载一个签名 XXX 信息 XXX，注意可能是签名或签名撤回信息！
+        # self.signatures.append() XXX 将dict类型的签名信息保存到 signatures 里面
+        pass
     def get_baseinfo(self):
         pubkeyring = {}
         keyindex = 1
@@ -217,28 +228,16 @@ class certificate(object):
         baseinfo = self.get_baseinfo()        
         # format json.
         hash_source = hashable_json(baseinfo)
+        # Get Hashes
+        hashes = []
+        for algoname in ['SHA512','SHA1','SHA256','MD5','WHIRLPOOL']:
+            hashes.append({'Algorithm':algoname,'Hash':self.get_hash(algoname)})
+        # Output
         j = {
-            'ID'   :self.get_baseinfo(),
+            'ID'   :self.get_id(),
             'Title':'Xi_Certificate',
             'Basic':baseinfo,
-            'Finger_Print':[
-                    {
-                        'Algorithm': 'SHA512',
-                        'Hash': self.get_hash('SHA512'),
-                    },
-                    {
-                        'Algorithm': 'MD5',
-                        'Hash': self.get_hash('MD5'),
-                    },
-                    {
-                        'Algorithm': 'SHA1',
-                        'Hash': self.get_hash('SHA1'),
-                    },
-                    {
-                        'Algorithm': 'WHIRLPOOL',
-                        'Hash': self.get_hash('WHIRLPOOL'),
-                    },
-                ],
+            'Finger_Print':hashes,
             'Signatures':{}
             }
         # return
@@ -331,4 +330,4 @@ if __name__ == "__main__":
     certtext2 = cert3.get_public_text()
 
     print '* ' * 40
-    print certtext == certtext2
+    print certtext #== certtext2
