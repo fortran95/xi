@@ -356,7 +356,7 @@ class _EC(object):
             raise Exception("Not initilized.")
 
         curvename = self._curves_name[curvename]
-
+        # XXX XXX XXX XXX XXX XXX 这里没有完善！XXX XXX XXX XXX XXX XXX XXX
         if curvename[0:10] == 'NID_X9_62_':
             return int(math.floor(int(curvename[15:18]) / 8.0))
         elif curvename[0:7] == 'NID_sec':

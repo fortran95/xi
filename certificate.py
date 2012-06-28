@@ -36,7 +36,6 @@ def hashable_json(input):
 class certificate(object):
     subject = None
     keys = None
-    signatures = None
     is_ours = False
     signatures = []
     
@@ -80,9 +79,10 @@ class certificate(object):
         savesh = shelve.open(filename,writeback=True)
         savesh.clear()
 
-        # save basic info
+        # save info
         savesh['Title']   = 'Xi_Certificate_Private'
         savesh['Basic']   = self.get_baseinfo()       
+        savesh['Signatures'] = []
         # save self.keys
         keyindex = 1
         for k in self.keys:
@@ -91,7 +91,9 @@ class certificate(object):
             keyindex += 1
 
         # save signatures
-        # TODO 
+        if self.signatures:
+            for sig in self.signatures:
+                savesh['Signature'].append(sig)
 
         # final
         savesh.sync()
@@ -156,15 +158,39 @@ class certificate(object):
     
     # XXX  证书如果没有签名，就是可疑的。提供签名和验证签名的方法。
     #        签名信息应当被单独列入一个类，提供签名的产生、导出、验证等方法。验证签名需要相应的公钥证书。
-    def do_sign(self,digest):
+    def do_sign(self,message,raw=True):
         # 通用的签名方法
         if not self.is_ours:
             raise Exception("This is not a private certificate that can be used for signing.")
+        ret = {}
+        keyindex = 1
         for key in self.keys:
-            signer = signature(json.dumps(key))
-            signer.new(digest,'SHA1')   # XXX 安全泄漏。应当考虑一种提供选择的方法
+            signer = signature.signature(key.get_privatekey())
+            sig = signer.new(message,'SHA1',raw)   # XXX 安全泄漏。应当考虑一种提供选择的方法
+            ret[keyindex] = sig
+            keyindex += 1
+        if raw:
+            return ret
+        else:
+            return json.dumps(ret)
+
+    def verify_sign(self,message,sign):
+        try:
+            if type() == type(""):
+                j = json.loads(sign)
+            else:
+                j = sign
+            keyindex = 1
+            for key in self.keys:
+                signer = signature.signature(json.dumps(key))
+                if not signer.verify(ret[keyindex],message):
+                    return False
+                keyindex += 1
+        except:
+            return False
+        return True
         
-    def do_sign_a_certificate(self,pubcert,trustlevel=0,life=0x9E3400, cert_hashalgo='SHA256', sign_hashalgo='SHA256', raw=False): 
+    def sign_certificate(self,pubcert,trustlevel=0,life=0x9E3400, cert_hashalgo='SHA256', sign_hashalgo='SHA256', raw=False): 
         # 用本证书签署 pubcert， 信任等级默认为0，有效期120天，使用 do_sign 进行最终的签名
 
         nowtime = time.time() + time.timezone # XXX 注意检查确认为 UTC 时间
@@ -177,16 +203,15 @@ class certificate(object):
             'Issuer_ID'           : self.get_id(),
             'Issue_UTC'           : int(nowtime),
             'Valid_To'            : int(nowtime + life),
-            'Cert_Hash_Algorithm' : 'SHA256',
+            'Trust_Level'         : int(trustlevel),
+            'Cert_Hash_Algorithm' : cert_hashalgo,
             'Cert_Digest'         : pubcert.get_hash(cert_hashalgo),
-            'Sign_Hash_Algorithm' : 'SHA256',
+            'Sign_Hash_Algorithm' : sign_hashalgo,
         }
 
-        sign_digest = Hash(sign_hashalgo,hashable_json(rawinfo)).digest().encode('base64')
+        sig = self.do_sign(hashable_json(rawinfo),raw=True)
 
-        signature = self.do_sign(sign_digest)
-
-        ret = {"Sign_Clear":rawinfo,"Signature":signature}
+        ret = {"Content":rawinfo,"Signature":sig}
 
         # 将签名写入 pubcert
         pubcert.signatures.append(ret)
@@ -197,9 +222,75 @@ class certificate(object):
             return json.dumps(ret)
     def revoke_signature(self,pubcert): # 提供产生对一个公域证书的撤回信息
         pass
-    def load_a_cert_signature(self,signstr): # 对于私或公用证书均可，加载一个签名 XXX 信息 XXX，注意可能是签名或签名撤回信息！
-        # self.signatures.append() XXX 将dict类型的签名信息保存到 signatures 里面
-        pass
+    def check_signature_content(self,content,loading=True):
+        try:
+            if type(content) == type(""):
+                c = json.loads(content)
+            else:
+                c = content
+            if   c['Title'] == 'New_Signature':         # 处理新签名的保存等
+                testkeys = ('Issuer_ID','Sign_Hash_Algorithm','Certified_ID','Cert_Digest','Trust_Level')
+
+                if int(c['Issue_UTC']) + int(c['Valid_To']) < time.time() + time.timezone:
+                    raise Exception("Given signature already expired.")
+
+                if loading: # 正在进行的是对一个证书载入新的签名
+                    if c['Certified_ID'] != self.get_id():
+                        raise Exception("Given signature is not for this certificate.")
+                    if c['Cert_Digest'] != self.get_hash(c['Cert_Hash_Algorithm']):
+                        raise Exception("Given signature used incorrect digest of this certificate.")
+                else:       # 正在进行的是用证书验证某个签名
+                    if c['Issuer_ID'] != self.get_id():
+                        raise Exception("Given signature cannot be validated with this certificate.")
+
+
+            elif c['Title'] == 'Revoke_Signature':      # 处理签名撤回
+                pass
+            else:
+                return False
+
+            for testkey in testkeys:
+                if not c.has_key(testkey):
+                    raise Exception("Signature format is bad.")
+
+        except:
+            return False
+        return True
+
+    def load_signature(self,sign): 
+        # 对于私或公用证书均可，加载一个签名信息，可能是签名或签名撤回信息
+        # XXX 只能进行初步的形式上的认证：是否是给此证书的，是否过期等。签名的有效性和可信等级需要安全顾问确认，非本class的职责。
+        try:
+            if type(sign) == type(""):
+                j = json.loads(sign)
+            else:
+                j = sign
+
+            sig = j['Signature']
+            c   = j['Content']
+
+            if not self.check_signature_content(c,loading=True):
+                raise Exception("This signature cannot be loaded. Either it is of invalid format, or it is not for this certificate.")
+
+            self.signatures.append(j)
+        except Exception,e:
+            raise Exception("Error loading a signature: %s" % e)
+    def verify_signature(self,sign): # 用本公钥证书验证一个签名
+        try:
+            if type(sign) == type(""):
+                j = json.loads(sign)
+            else:
+                j = sign
+            c = j['Content']
+            sig = j['Signature']
+    
+            if not self.check_signature_content(c,loading=False):
+                return False
+
+            return self.verify_sign(hashable_json(c),sig)
+        except:
+            return False
+        return True
     def get_baseinfo(self):
         pubkeyring = {}
         keyindex = 1
@@ -315,7 +406,7 @@ class certificate(object):
 
 if __name__ == "__main__":
     cert = certificate()
-    cert.generate('NERV',bits=1024)
+    cert.generate('NERV Root Authority of Xi Projects',bits=1024)
     print "-" * 80
     certtext = cert.get_public_text()
 
@@ -330,4 +421,6 @@ if __name__ == "__main__":
     certtext2 = cert3.get_public_text()
 
     print '* ' * 40
-    print certtext #== certtext2
+    # 自签名测试
+    sig = cert3.sign_certificate(cert3)
+    print sig

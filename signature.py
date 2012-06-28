@@ -11,24 +11,30 @@ class signature(object):
     def __init__(self,publickeystr):
         self.key = PublicKeyAlgorithm(publickeystr)
 
-    def new(self,message,digestmod = 'whirlpool'):
+    def new(self,message,digestmod = 'whirlpool',raw=False):
         msghash = Hash(digestmod,message).digest()
         try:
             signraw = self.key.sign(msghash)
         except Exception,e:
             raise Exception("Unable to sign, error: %s" % e)
+        
+        signature = {'Type':'Signature','Digest_Method':digestmod,'Data':signraw.encode('base64')}
 
-        signstr = json.dumps({'Type':'signature','Digest_Method':digestmod,'Data':signraw})
-
-        return signstr
+        if raw:
+            return signature
+        else:
+            return json.dumps(signature)
 
     def verify(self,signature,message):
         try:
-            j = json.loads(signature)
-            if j['Type'] != 'signature':
+            if type(signature) == type(""):
+                j = json.loads(signature)
+            else:
+                j = signature
+            if j['Type'] != 'Signature':
                 raise Exception("This may not be a signature.")
             digestmod = j['Digest_Method']
-            signraw = j['Data']
+            signraw = j['Data'].decode('base64')
         except Exception,e:
             raise Exception("Bad format of signature, error: %s" % e)
         msghash = Hash(digestmod,message).digest()
