@@ -186,10 +186,17 @@ class certificate(object):
             keyindex = 1
             for key in self.keys:
                 signer = signature.signature(key.get_publickey())
-                if not signer.verify(sign[keyindex],message):
+                if j.has_key(keyindex):
+                    sig = j[keyindex]
+                elif j.has_key(str(keyindex)):
+                    sig = j[str(keyindex)]
+                else:
+                    return False
+                if not signer.verify(sig,message):
                     return False
                 keyindex += 1
         except Exception,e:
+            print "Error: %s" % e
             return False
         return True
         
@@ -340,7 +347,7 @@ class certificate(object):
             }
         # return
         return json.dumps(j,indent=2,sort_keys=True)
-    def load_public_certificate(self,text):
+    def load_public_text(self,text):
         try:
             j = json.loads(text)
             if j['Title'] != 'Xi_Certificate':
@@ -396,6 +403,10 @@ class certificate(object):
             if wanted_id != certid:
                 raise Exception("Certificate ID do not match its content.")
 
+            # save info
+            self.keys = [eckey, rsakey]
+            self.subject = basic_subject
+
             # Load signatures
             self.signatures = []
             if j.has_key('Signatures'):
@@ -405,8 +416,6 @@ class certificate(object):
             # Now load this certificate.
 
             self.is_ours = False
-            self.keys = [eckey, rsakey]
-            self.subject = basic_subject
 
             print "Certificate verified and loaded."
             return True
@@ -442,9 +451,25 @@ if __name__ == "__main__":
 
     cert3.save_private_text("testcert")
     """
-    cert = certificate()
+    rootprv = certificate()
     #cert.generate('NERV',bits=1024)
     #print cert.verify_sign('a',cert.do_sign('a'))
-    cert.load_private_text('testcert')
-    print cert.get_public_text()
-    print cert.verify_signature(cert.signatures[0])
+    rootprv.load_private_text('testcert')
+
+    pubtext = rootprv.get_public_text()
+    #print pubtext
+    
+    rootpub = certificate()
+    rootpub.load_public_text(pubtext)
+
+    subprv = certificate()
+    subprv.load_private_text('somecert_sigd')
+
+    subtext = subprv.get_public_text()
+
+    subpub = certificate()
+    subpub.load_public_text(subtext)
+
+    print rootpub.verify_signature(subpub.signatures[0])
+
+    print subtext
