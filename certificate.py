@@ -65,13 +65,11 @@ class certificate(object):
         
         self.keys = [key_ec,key_rsa]
         self.is_ours = True
-        
-        # - clear others
+        # clear others
         self.signatures = None
         
         # After generated, load this cert. into the instance.
 
-    # TODO 提供导出和导入私有证书的方法。
     def save_private_text(self,filename):
         if not self.is_ours:
             raise Exception("Trying to save private info of a public certificate.")
@@ -93,7 +91,7 @@ class certificate(object):
         # save signatures
         if self.signatures:
             for sig in self.signatures:
-                savesh['Signature'].append(sig)
+                savesh['Signatures'].append(sig)
 
         # final
         savesh.sync()
@@ -136,13 +134,18 @@ class certificate(object):
             if not ( eckey._key != None and rsakey._key != None ):
                 raise Exception("This certificate has insufficient private key info.")
 
-            # TODO check signatures, consult reliability.
+            self.keys = [eckey, rsakey]
+            self.subject = basic_subject
+            
+            # Load signatures
+            self.signatures = []
+            if loadsh.has_key('Signatures'):
+                for sig in loadsh['Signatures']:
+                    self.load_signature(sig)
 
             # Now load this certificate.
 
             self.is_ours = True
-            self.keys = [eckey, rsakey]
-            self.subject = basic_subject
 
             print "Certificate verified and loaded."
             return True
@@ -151,7 +154,7 @@ class certificate(object):
             raise Exception("Certificate format is bad: %s" % e)
 
 
-    # TODO 提供使用证书进行加密和签署的方法。用于给证书持有者传递信息，以及让证书持有者自己签署信息。
+    # XXX 提供使用证书进行加密和签署的方法。用于给证书持有者传递信息，以及让证书持有者自己签署信息。
     # XXX  具体来说，需要提供：
     #    XXX 用自己的私人证书产生给一个来自公共域的证书的签名信息(此人给出信任等级)
     #    XXX 向一个（公有或者私有的）证书中插入来自外人的签名（验证并储存，然后可以通过get_public_text或者save_private_text储存
@@ -194,8 +197,6 @@ class certificate(object):
         # 用本证书签署 pubcert， 信任等级默认为0，有效期120天，使用 do_sign 进行最终的签名
 
         nowtime = time.time() + time.timezone # XXX 注意检查确认为 UTC 时间
-        cert_hashalgo = 'SHA256'
-        sign_hashalgo = 'SHA256'
 
         rawinfo = {
             'Title'               : 'New_Signature',
@@ -243,17 +244,17 @@ class certificate(object):
                     if c['Issuer_ID'] != self.get_id():
                         raise Exception("Given signature cannot be validated with this certificate.")
 
-
             elif c['Title'] == 'Revoke_Signature':      # 处理签名撤回
                 pass
             else:
                 return False
-
+            
             for testkey in testkeys:
                 if not c.has_key(testkey):
                     raise Exception("Signature format is bad.")
 
-        except:
+        except Exception,e:
+            print e
             return False
         return True
 
@@ -323,13 +324,18 @@ class certificate(object):
         hashes = []
         for algoname in ['SHA512','SHA1','SHA256','MD5','WHIRLPOOL']:
             hashes.append({'Algorithm':algoname,'Hash':self.get_hash(algoname)})
+        # Get Signatures
+        sigs = []
+        if self.signatures:
+            for sig in self.signatures:
+                sigs.append(sig)
         # Output
         j = {
-            'ID'   :self.get_id(),
-            'Title':'Xi_Certificate',
-            'Basic':baseinfo,
-            'Finger_Print':hashes,
-            'Signatures':{}
+            'ID'            : self.get_id(),
+            'Title'         : 'Xi_Certificate',
+            'Basic'         : baseinfo,
+            'Finger_Print'  : hashes,
+            'Signatures'    : sigs,
             }
         # return
         return json.dumps(j,indent=2,sort_keys=True)
@@ -389,7 +395,11 @@ class certificate(object):
             if wanted_id != certid:
                 raise Exception("Certificate ID do not match its content.")
 
-            # TODO check signatures, consult reliability.
+            # Load signatures
+            self.signatures = []
+            if j.has_key('Signatures'):
+                for sig in j['Signatures']:
+                    self.load_signature(sig)
 
             # Now load this certificate.
 
@@ -405,6 +415,7 @@ class certificate(object):
 
 
 if __name__ == "__main__":
+    """
     cert = certificate()
     cert.generate('NERV Root Authority of Xi Projects',bits=1024)
     print "-" * 80
@@ -413,7 +424,7 @@ if __name__ == "__main__":
     cert2 = certificate()
     cert2.load_public_certificate(certtext)
 
-    cert.save_private_text("testcert")
+#    cert.save_private_text("testcert")
 
     cert3 = certificate()
     cert3.load_private_text("testcert")
@@ -422,5 +433,14 @@ if __name__ == "__main__":
 
     print '* ' * 40
     # 自签名测试
-    sig = cert3.sign_certificate(cert3)
+    sig = cert3.sign_certificate(cert3,trustlevel=3)
     print sig
+
+    print '* ' * 40
+    cert3.load_signature(sig)
+
+    cert3.save_private_text("testcert")
+    """
+    cert = certificate()
+    cert.load_private_text('testcert')
+    print cert.get_public_text()
