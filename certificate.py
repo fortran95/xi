@@ -179,17 +179,17 @@ class certificate(object):
 
     def verify_sign(self,message,sign):
         try:
-            if type() == type(""):
+            if type(sign) == type(""):
                 j = json.loads(sign)
             else:
                 j = sign
             keyindex = 1
             for key in self.keys:
-                signer = signature.signature(json.dumps(key))
-                if not signer.verify(ret[keyindex],message):
+                signer = signature.signature(key.get_publickey())
+                if not signer.verify(sign[keyindex],message):
                     return False
                 keyindex += 1
-        except:
+        except Exception,e:
             return False
         return True
         
@@ -272,7 +272,7 @@ class certificate(object):
 
             if not self.check_signature_content(c,loading=True):
                 raise Exception("This signature cannot be loaded. Either it is of invalid format, or it is not for this certificate.")
-
+            print 'Loaded a signature'
             self.signatures.append(j)
         except Exception,e:
             raise Exception("Error loading a signature: %s" % e)
@@ -289,7 +289,8 @@ class certificate(object):
                 return False
 
             return self.verify_sign(hashable_json(c),sig)
-        except:
+        except Exception,e:
+            print e
             return False
         return True
     def get_baseinfo(self):
@@ -442,5 +443,8 @@ if __name__ == "__main__":
     cert3.save_private_text("testcert")
     """
     cert = certificate()
+    #cert.generate('NERV',bits=1024)
+    #print cert.verify_sign('a',cert.do_sign('a'))
     cert.load_private_text('testcert')
     print cert.get_public_text()
+    print cert.verify_signature(cert.signatures[0])
