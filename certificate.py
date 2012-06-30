@@ -41,7 +41,7 @@ class certificate(object):
     
     def __init__(self):
         pass
-    def generate(self,subject,**argv):
+    def generate(self,subject,level=0,**argv):
         # Will generate a new certificate. Compatiable with NERV-XI-001 Standard.
         
         # - subject
@@ -67,6 +67,7 @@ class certificate(object):
         self.is_ours = True
         # clear others
         self.signatures = None
+        self.level = level
         
         # After generated, load this cert. into the instance.
 
@@ -107,6 +108,7 @@ class certificate(object):
             basic = loadsh['Basic']
             basic_version = basic['Version']
             basic_subject = basic['Subject']
+            basic_level   = basic['Level']
             basic_public_key_ring = basic['Public_Key_Ring']
 
             certid = Hash('md5',hashable_json(basic)).hexdigest()
@@ -136,6 +138,7 @@ class certificate(object):
 
             self.keys = [eckey, rsakey]
             self.subject = basic_subject
+            self.level   = basic_level
             
             # Load signatures
             self.signatures = []
@@ -310,6 +313,7 @@ class certificate(object):
         baseinfo = {
                 'Version': '1',
                 'Subject': self.subject,
+                'Level'  : int(self.level),
                 'Public_Key_Ring':pubkeyring,
             }
         return baseinfo
@@ -358,6 +362,7 @@ class certificate(object):
             basic = j['Basic']
             basic_version = basic['Version']
             basic_subject = basic['Subject']
+            basic_level   = basic['Level']
             basic_public_key_ring = basic['Public_Key_Ring']
 
             fingerprint = j['Finger_Print']
@@ -406,6 +411,7 @@ class certificate(object):
             # save info
             self.keys = [eckey, rsakey]
             self.subject = basic_subject
+            self.level   = basic_level
 
             # Load signatures
             self.signatures = []
@@ -427,20 +433,20 @@ class certificate(object):
 if __name__ == "__main__":
     """
     cert = certificate()
-    cert.generate('NERV Root Authority of Xi Projects',bits=1024)
+    cert.generate('Example Cert',level=0,bits=1024)
     print "-" * 80
     certtext = cert.get_public_text()
 
     cert2 = certificate()
-    cert2.load_public_certificate(certtext)
+    cert2.load_public_text(certtext)
 
-#    cert.save_private_text("testcert")
+    cert.save_private_text("somecert")
 
     cert3 = certificate()
-    cert3.load_private_text("testcert")
+    cert3.load_private_text("somecert")
 
     certtext2 = cert3.get_public_text()
-
+    
     print '* ' * 40
     # 自签名测试
     sig = cert3.sign_certificate(cert3,trustlevel=3)
@@ -462,6 +468,8 @@ if __name__ == "__main__":
     rootpub = certificate()
     rootpub.load_public_text(pubtext)
 
+    #print rootpub.get_public_text() == pubtext
+    
     subprv = certificate()
     subprv.load_private_text('somecert_sigd')
 
@@ -471,5 +479,10 @@ if __name__ == "__main__":
     subpub.load_public_text(subtext)
 
     print rootpub.verify_signature(subpub.signatures[0])
+    #rootprv.sign_certificate(subpub,trustlevel=3)
+    #subprv.load_signature(subpub.signatures[0])
 
-    print subtext
+    #subprv.save_private_text('somecert_sigd')
+
+    #print subtext
+    #"""
