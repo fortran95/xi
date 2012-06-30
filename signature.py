@@ -4,7 +4,7 @@
 
 from hashes import *
 from publickeyalgo import PublicKeyAlgorithm
-import json
+import json,random
 
 class signature(object):
 
@@ -12,13 +12,17 @@ class signature(object):
         self.key = PublicKeyAlgorithm(publickeystr)
 
     def new(self,message,digestmod = 'whirlpool',raw=False):
-        msghash = Hash(digestmod,message).digest()
+        hmackey = ''
+        for i in range(0,64):
+            hmackey += chr(random.randint(0,255))
+
+        msghash = Hash(digestmod,message).hmac(hmackey,True)
         try:
             signraw = self.key.sign(msghash)
         except Exception,e:
             raise Exception("Unable to sign, error: %s" % e)
         
-        signature = {'Type':'Signature','Digest_Method':digestmod,'Data':signraw.encode('base64')}
+        signature = {'Type':'Signature','HMAC_Key':hmackey.encode('base64'),'Digest_Method':digestmod,'Data':signraw.encode('base64')}
 
         if raw:
             return signature
@@ -35,9 +39,12 @@ class signature(object):
                 raise Exception("This may not be a signature.")
             digestmod = j['Digest_Method']
             signraw = j['Data'].decode('base64')
+            if j.has_key('HMAC_Key'):
+                msghash = Hash(digestmod,message).hmac(j['HMAC_Key'].decode('base64'),True)
+            else:
+                msghash = Hash(digestmod,message).digest()
         except Exception,e:
             raise Exception("Bad format of signature, error: %s" % e)
-        msghash = Hash(digestmod,message).digest()
 
         return self.key.verify(msghash,signraw)
 

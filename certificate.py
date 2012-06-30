@@ -66,7 +66,7 @@ class certificate(object):
         self.keys = [key_ec,key_rsa]
         self.is_ours = True
         # clear others
-        self.signatures = None
+        self.signatures = []
         self.level = level
         
         # After generated, load this cert. into the instance.
@@ -431,6 +431,14 @@ class certificate(object):
 
 
 if __name__ == "__main__":
+    c = certificate()
+    c.generate('NERV',level=9,bits=1024)
+    c.sign_certificate(c)
+    pubtext = c.get_public_text()
+
+    p = certificate()
+    p.load_public_text(pubtext)
+    print c.verify_signature(p.signatures[0])
     """
     cert = certificate()
     cert.generate('Example Cert',level=0,bits=1024)
@@ -456,7 +464,7 @@ if __name__ == "__main__":
     cert3.load_signature(sig)
 
     cert3.save_private_text("testcert")
-    """
+    ""
     rootprv = certificate()
     #cert.generate('NERV',bits=1024)
     #print cert.verify_sign('a',cert.do_sign('a'))
@@ -485,4 +493,4 @@ if __name__ == "__main__":
     #subprv.save_private_text('somecert_sigd')
 
     #print subtext
-    #"""
+    """
