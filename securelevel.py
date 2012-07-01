@@ -25,13 +25,27 @@ class securelevel(object):
         #  1) trust_level   最终计算出的建议信任等级，整型
         #  2) chain         list，依次记录从证书到根证书经过的各个证书的 (ID,Subject,TrustLevel)
         #  3) root          (ID,Subject)，信任链的根证书，如果是无效的（无根证书），则此项为空
-        ret = self.walk(pubcert)
-        if ret != []:
-            for i in range(0,len(ret)):
-                item = ret[i]
-                consult_result = self.consult(self.indexes[item[0]][0])
-                if consult_result != []:
-                    ret[i] = consult_result
+
+        parents = self.walk(pubcert)
+        if parents != []:
+            ret = {}
+            for i in range(0,len(parents)):
+                item = parents[i]
+                ret[item[0]] = None
+        else:
+            pubcert_id = pubcert.get_id()
+            pubcert_isroot = False
+            if self.indexes.has_key(pubcert_id):
+                pubcert_isroot = self.indexes[pubcert_id][1]
+            ret = pubcert_isroot
+        print '<'
+        print ret
+        if type(ret) == type({}):
+            for key in ret:
+                cr = self.consult(self.indexes[key][0])
+                ret[key] = cr
+        print ret
+        print '>'
         return ret
     def walk(self,cert):
         cert_level = cert.level
@@ -45,6 +59,8 @@ class securelevel(object):
                 if issuer.verify_signature(sig):
                     # 得到了本证书的一个上级证书，并且通过了验证
                     ret.append((issuer.get_id(),self.indexes[issuer_id][1]))
+        #print "Walk result of '%s':" % cert.subject
+        #print ret
         return ret
     def initilize(self):
         print "Caching all known certificates."
@@ -71,6 +87,9 @@ if __name__ == '__main__':
     a = securelevel()
     c = certificate.certificate()
 
-    c.load_public_text(open(USERCERTPATH + '/1').read())
+    c.load_public_text(open(USERCERTPATH + '/sl.pub').read())
 
-    print a.consult(c)
+    r = None
+    print a.consult(c)#,r)
+
+    #print r

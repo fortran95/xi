@@ -431,66 +431,13 @@ class certificate(object):
 
 
 if __name__ == "__main__":
-    c = certificate()
-    c.generate('NERV',level=9,bits=1024)
-    c.sign_certificate(c)
-    pubtext = c.get_public_text()
+    parent = certificate()
+    parent.load_private_text('example2')
 
-    p = certificate()
-    p.load_public_text(pubtext)
-    print c.verify_signature(p.signatures[0])
-    """
-    cert = certificate()
-    cert.generate('Example Cert',level=0,bits=1024)
-    print "-" * 80
-    certtext = cert.get_public_text()
+    child = certificate()
+    child.generate('Some lowest certificate',level=0,bits=1024)
+    parent.sign_certificate(child)
 
-    cert2 = certificate()
-    cert2.load_public_text(certtext)
+    child.save_private_text('sl.prv')
 
-    cert.save_private_text("somecert")
-
-    cert3 = certificate()
-    cert3.load_private_text("somecert")
-
-    certtext2 = cert3.get_public_text()
-    
-    print '* ' * 40
-    # 自签名测试
-    sig = cert3.sign_certificate(cert3,trustlevel=3)
-    print sig
-
-    print '* ' * 40
-    cert3.load_signature(sig)
-
-    cert3.save_private_text("testcert")
-    ""
-    rootprv = certificate()
-    #cert.generate('NERV',bits=1024)
-    #print cert.verify_sign('a',cert.do_sign('a'))
-    rootprv.load_private_text('testcert')
-
-    pubtext = rootprv.get_public_text()
-    #print pubtext
-    
-    rootpub = certificate()
-    rootpub.load_public_text(pubtext)
-
-    #print rootpub.get_public_text() == pubtext
-    
-    subprv = certificate()
-    subprv.load_private_text('somecert_sigd')
-
-    subtext = subprv.get_public_text()
-
-    subpub = certificate()
-    subpub.load_public_text(subtext)
-
-    print rootpub.verify_signature(subpub.signatures[0])
-    #rootprv.sign_certificate(subpub,trustlevel=3)
-    #subprv.load_signature(subpub.signatures[0])
-
-    #subprv.save_private_text('somecert_sigd')
-
-    #print subtext
-    """
+    print child.get_public_text()
