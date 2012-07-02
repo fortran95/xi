@@ -13,12 +13,43 @@ USERCERTPATH = BASEPATH + 'user/usercerts'
 
 class securelevel(object):
     indexes = {}
+    foreigners = [] # 记录没见过的证书ID
     def __init__(self):
         # 缓存证书ID-文件关系
         # 根证书储存在   user/rootcerts 下面
         # 其他证书储存在 user/usercerts 下面
         print "Initializing Secure Consultant."
         self.initilize()
+    def trustlevel(self,consultresult,strict=False):
+        # 根据 consult 的结果，计算 trustlevel
+        # 如果 strict==False，则在同级签名中取信任等级最高的。
+        levels = []
+        
+        for key in consultresult:
+            plocation  = key.find('.')
+            cert_id    = key[0:plocation]
+            this_level = int(key[plocation+1:])
+
+            # Get parents' trust level
+            if type(consultresult[key]) == dict:
+                parents_level = self.trustlevel(consultresult[key],strict)
+            else:
+                if consultresult[key] == True:
+                    parents_level = this_level
+                else:
+                    parents_level = 0
+
+#            if parents_level != True:
+            this_level = min(parents_level,this_level)
+            levels.append(this_level)
+            print cert_id
+        print levels
+        if strict:
+            return min(levels)
+        else:
+            return max(levels)
+        
+        
     def consult(self,pubcert):
         # 根据证书签名得知一个证书的一个或数个信任链
         # 一个信任链是一个 dict ，结构为：
@@ -31,21 +62,21 @@ class securelevel(object):
             ret = {}
             for i in range(0,len(parents)):
                 item = parents[i]
-                ret[item[0]] = None
+                ret[item[0] + '.' + str(item[2])] = None
         else:
             pubcert_id = pubcert.get_id()
             pubcert_isroot = False
             if self.indexes.has_key(pubcert_id):
                 pubcert_isroot = self.indexes[pubcert_id][1]
             ret = pubcert_isroot
-        print '<'
-        print ret
+        #print '<'
+        #print ret
         if type(ret) == type({}):
             for key in ret:
-                cr = self.consult(self.indexes[key][0])
+                cr = self.consult(self.indexes[key[0:32]][0])
                 ret[key] = cr
-        print ret
-        print '>'
+        #print ret
+        #print '>'
         return ret
     def walk(self,cert):
         cert_level = cert.level
@@ -58,7 +89,10 @@ class securelevel(object):
                     continue
                 if issuer.verify_signature(sig):
                     # 得到了本证书的一个上级证书，并且通过了验证
-                    ret.append((issuer.get_id(),self.indexes[issuer_id][1]))
+                    print "Verified."
+                    ret.append((issuer.get_id(),self.indexes[issuer_id][1],sig['Content']['Trust_Level']))
+            else:
+                self.foreigners.append(issuer_id)
         #print "Walk result of '%s':" % cert.subject
         #print ret
         return ret
@@ -85,11 +119,19 @@ class securelevel(object):
 
 if __name__ == '__main__':
     a = securelevel()
-    c = certificate.certificate()
+    
+    #c = certificate.certificate()
 
-    c.load_public_text(open(USERCERTPATH + '/sl.pub').read())
+    #c.load_public_text(open(USERCERTPATH + '/sl.pub').read())
 
-    r = None
-    print a.consult(c)#,r)
-
-    #print r
+    #cr = a.consult(c)#,r)
+    #print cr
+    
+    print a.trustlevel(
+        {'6db6ca27d5f3cc5eabec7a8c098091d3.6': {'f0b00f0dd035aa4e2289cc6561c453533.5': True,'fxb00f0dd035aa4e2289cc6561c45353.8':True},
+         '6db6ca27d5fxcc5eabec7a8c098091d3.1': {'f0b00f0dd035aa4e2289cc6561c4b5333.4': True,'fxb00f0dd035aa4e2289cc65x1c45353.82':True},
+         '6db6ca27d5fxcc5eabec7a8c098091d3.10': False
+        }
+        ,
+        False
+    )
