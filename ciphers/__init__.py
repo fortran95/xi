@@ -230,6 +230,7 @@ if __name__ == "__main__":
     text = open("rijndael.py").read()# + open("rijndael.py").read()"""
     xi = xipher(key)
 #    print len(text)
+#    exit()
     import time
     start = time.time()
     times = 1

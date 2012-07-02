@@ -42,8 +42,6 @@ class securelevel(object):
 #            if parents_level != True:
             this_level = min(parents_level,this_level)
             levels.append(this_level)
-            print cert_id
-        print levels
         if strict:
             return min(levels)
         else:
@@ -120,18 +118,11 @@ class securelevel(object):
 if __name__ == '__main__':
     a = securelevel()
     
-    #c = certificate.certificate()
+    c = certificate.certificate()
 
-    #c.load_public_text(open(USERCERTPATH + '/sl.pub').read())
+    c.load_public_text(open(USERCERTPATH + '/sl.pub').read())
 
-    #cr = a.consult(c)#,r)
-    #print cr
+    cr = a.consult(c)#,r)
+    print cr
     
-    print a.trustlevel(
-        {'6db6ca27d5f3cc5eabec7a8c098091d3.6': {'f0b00f0dd035aa4e2289cc6561c453533.5': True,'fxb00f0dd035aa4e2289cc6561c45353.8':True},
-         '6db6ca27d5fxcc5eabec7a8c098091d3.1': {'f0b00f0dd035aa4e2289cc6561c4b5333.4': True,'fxb00f0dd035aa4e2289cc65x1c45353.82':True},
-         '6db6ca27d5fxcc5eabec7a8c098091d3.10': False
-        }
-        ,
-        False
-    )
+    print a.trustlevel(cr)
