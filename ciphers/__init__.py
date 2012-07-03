@@ -155,9 +155,9 @@ class xipher(object):
             raise Exception("This packager requires a package key of %d bytes." % rijndael.key_size)
         tool = mode_cbc(rijndael.Rijndael(self.packagekey), rijndael.block_size)
         if enpack:
-            return tool.encrypt(data)
+            return tool.encrypt(data).encode('base64')
         else:
-            return tool.decrypt(data)
+            return tool.decrypt(data.decode('base64'))
 
     encrypt_chain = []
 
@@ -226,8 +226,8 @@ class xipher(object):
 
 
 if __name__ == "__main__":
-    key = "dsjkfajksdjflkasjfkjks" * 16
-    text = open("rijndael.py").read()# + open("rijndael.py").read()"""
+    key = "d" * 128
+    text = "d" * 64#open("rijndael.py").read()# + open("rijndael.py").read()"""
     xi = xipher(key)
 #    print len(text)
 #    exit()

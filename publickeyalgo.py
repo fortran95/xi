@@ -114,7 +114,7 @@ class _RSA(object):
         if self._key == None:
             return False
         try:
-            if type(j) == str:
+            if type(ciphertext) == str:
                 j = json.loads(ciphertext)
             else:
                 j = ciphertext

@@ -466,11 +466,13 @@ class certificate(object):
             raise Exception("Certificate format is bad: %s" % e)
 
     def _encryptor(self,message,key):
+        #return message.encode('base64')
         if len(key) < 128:
             key = Hash('sha512',key).digest() + Hash('whirlpool',key).digest()
         xi = ciphers.xipher(key)
         return xi.encrypt(message)
     def _decryptor(self,message,key):
+        #return message.decode('base64')
         if len(key) < 128:
             key = Hash('sha512',key).digest() + Hash('whirlpool',key).digest()
         xi = ciphers.xipher(key)
@@ -521,7 +523,8 @@ class certificate(object):
                 pka = publickeyalgo.PublicKeyAlgorithm(self.keys[sqid - 1].get_privatekey(False))
                 randomkey = pka.decrypt(keyparts[sqid],self._decryptor)
                 tempkey += randomkey
-            print "Tempkey is: %s" % tempkey
+            #print "Tempkey is: %s" % tempkey
+            return self._decryptor(ciphertext,tempkey)
         except Exception,e:
             raise Exception("Decrypting Failure: %s" % e)
 if __name__ == "__main__":
@@ -531,5 +534,6 @@ if __name__ == "__main__":
 
 #    d = certificate()
 #    d.load_private_text('alice.private')
-    ped = c.public_encrypt('a' * 1025,True)
+    ped = c.public_encrypt('a' * 10,True)
+    print ped
     print c.private_decrypt(ped)
