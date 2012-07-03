@@ -101,7 +101,7 @@ class _RSA(object):
         for i in range(0,maxlen):
             tempkey += chr(random.randint(0,255))
         # encrypt the message using tempkey.
-        data = encryptor(message,tempkey)
+        data = encryptor(tempkey,message)
         keyinfo = self._pubkey.public_encrypt(tempkey,4)
         # Write out.
         ret = {
@@ -128,7 +128,7 @@ class _RSA(object):
             tempkey = self._key.private_decrypt(tempkey,4)
         except Exception,e:
             raise Exception("Unable to decrypt this RSA ciphertext: %s" % e)
-        return decryptor(ciphertext,tempkey)
+        return decryptor(tempkey,ciphertext)
     def load_publickey(self,publickey):
         # Try parse the public key info.
         try:
@@ -418,7 +418,7 @@ class _EC(object):
         print "Length of key is: %d" % (len(sharedsecret) * 8)
 
         # Encrypt
-        ciphertext = encryptor(message,sharedsecret)
+        ciphertext = encryptor(sharedsecret,message)
         # Get tempkey's public key.
         filename = tempfilename()
         tempkey.save_pub_key(filename)
@@ -457,7 +457,7 @@ class _EC(object):
             sharedsecret = self._key.compute_dh_key(tempkey)
         except Exception,e:
             raise Exception("Unable to load public key. Error is [%s]." % e)
-        return decryptor(ciphertext,sharedsecret)
+        return decryptor(sharedsecret,ciphertext)
     def load_publickey(self,publickey):
         # Try parse the public key info.
         try:
@@ -559,7 +559,5 @@ if __name__ == "__main__":
     r = _EC()
     r.generate()
     def encryptor(key,message):
-        return 'ok'
-    r.encrypt('a' * 1024, encryptor)
-    print "Sign limit: %d" % (r.sign_limit() * 8)
-    r.sign('a' * r.sign_limit())
+        print "Encrypted with %s" % key.encode('hex')
+        return 

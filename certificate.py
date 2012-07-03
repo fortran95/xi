@@ -465,13 +465,23 @@ class certificate(object):
         except Exception,e:
             raise Exception("Certificate format is bad: %s" % e)
 
-    def _encryptor(self,message,key):
+    def _encryptor(self,key,message):
+        from ciphers.xxtea import XXTEA
+        e = XXTEA(Hash('md5',key).digest())
+        return e.encrypt(message.encode('hex').encode('hex'))
+
+        print "Encrypted with '%s'" % Hash('md5',key).hexdigest()
         #return message.encode('base64')
         if len(key) < 128:
             key = Hash('sha512',key).digest() + Hash('whirlpool',key).digest()
         xi = ciphers.xipher(key)
         return xi.encrypt(message)
-    def _decryptor(self,message,key):
+    def _decryptor(self,key,message):
+        from ciphers.xxtea import XXTEA
+        d = XXTEA(Hash('md5',key).digest())
+        return d.decrypt(message).decode('hex').decode('hex')
+
+        print "Decrypted with '%s'" % Hash('md5',key).hexdigest()
         #return message.decode('base64')
         if len(key) < 128:
             key = Hash('sha512',key).digest() + Hash('whirlpool',key).digest()
@@ -481,7 +491,7 @@ class certificate(object):
     def public_encrypt(self,data,raw=True):
         keyindex = 1
         keyparts = {}
-        tempkey = ''
+        tempkey = []
         
         for k in self.keys:
             pka = publickeyalgo.PublicKeyAlgorithm(k.get_publickey())
@@ -490,18 +500,21 @@ class certificate(object):
             randomkey = ''
             for i in range(0,64):
                 randomkey += chr(random.randint(0,255))
-            tempkey += randomkey
+            tempkey.append(randomkey)
             keyparts[keyindex] = json.loads(pka.encrypt(randomkey,self._encryptor))
-            
 
             keyindex += 1
+
+        tempkey.sort()
+        print "Before generation:"
+        print tempkey
+        tempkey = "".join(tempkey)
         
-        ciphertext = self._encryptor(data,tempkey)
+        ciphertext = self._encryptor(tempkey,data)
         
         ret = {'Title':'Certificate_Encrypted_Text','Certificate_ID':self.get_id(),'Key_Parts':keyparts,'Ciphertext':ciphertext.encode('base64')}
         if not raw:
             ret = json.dumps(ret)
-
         return ret
     def private_decrypt(self,data):
         if not self.is_ours:
@@ -518,13 +531,19 @@ class certificate(object):
             ciphertext = j['Ciphertext'].decode('base64')
             keyparts   = j['Key_Parts']
 
-            tempkey = ''
+            tempkey = []
             for sqid in keyparts:
                 pka = publickeyalgo.PublicKeyAlgorithm(self.keys[sqid - 1].get_privatekey(False))
                 randomkey = pka.decrypt(keyparts[sqid],self._decryptor)
-                tempkey += randomkey
-            #print "Tempkey is: %s" % tempkey
-            return self._decryptor(ciphertext,tempkey)
+                #print "   Temp Key Part(%d): %s" % (sqid,randomkey.encode('base64'))
+                tempkey.append(randomkey)
+            
+            tempkey.sort()
+            print "After generation:"
+            print tempkey
+            tempkey = "".join(tempkey)
+
+            return self._decryptor(tempkey,ciphertext)
         except Exception,e:
             raise Exception("Decrypting Failure: %s" % e)
 if __name__ == "__main__":
@@ -535,5 +554,5 @@ if __name__ == "__main__":
 #    d = certificate()
 #    d.load_private_text('alice.private')
     ped = c.public_encrypt('a' * 10,True)
-    print ped
+    #print ped
     print c.private_decrypt(ped)

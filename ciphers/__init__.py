@@ -3,40 +3,12 @@
 import struct,random,zlib
 import blowfish, rijndael, twofish, serpent, xxtea
 
-class padding(object):
-    def __init__(self,blocksize):
-
-        if blocksize > 256 or blocksize < 1:
-            raise Exception("Cannot do such blocksize: %d" % blocksize)
-
-        self.blocksize = blocksize
-        
-    def enpad(self,data):
-
-        padlen = self.blocksize - len(data) % self.blocksize
-
-        if padlen == self.blocksize:
-            return data
-        else:
-            return data + chr(padlen) * padlen
-
-    def depad(self,data):
-
-        padlen = ord(data[-1:])
-
-        padstr = data[-padlen:]
-
-        if padstr == chr(padlen) * padlen:
-            return data[0:len(data) - padlen]
-        else:
-            return data
-
 class mode_cbc(object):
     def __init__(self,cipher,blocksize=16):
 
         self.cipher = cipher
         self.blocksize = blocksize
-        self.padder = padding(blocksize)
+        
         self.splitcmd = "%ds" % self.blocksize
     def _block_xor(self,block1, block2):
         ret = ''
@@ -45,9 +17,10 @@ class mode_cbc(object):
         return ret
 
     def encrypt(self,data):
-
-        data = self.padder.enpad(data)
         datalen = len(data)
+
+        if datalen % self.blocksize != 0:
+            raise Exception("CBC mode error: supplied data length(%d) is not integer multiple of %d." % (datalen,self.blocksize))
         
         blocks = struct.unpack(self.splitcmd * (datalen / self.blocksize), data)
         iv = ''
@@ -101,7 +74,7 @@ class mode_cbc(object):
             print "Because of a CBC_MAC integrity check failure, decryption cancelled."
             return False    # Data corrupted.
 
-        return self.padder.depad("".join(result))
+        return "".join(result)
 
 
 class mode_ecb(object):
@@ -109,13 +82,12 @@ class mode_ecb(object):
 
         self.cipher = cipher
         self.blocksize = blocksize
-        self.padder = padding(blocksize)
         self.splitcmd = "%ds" % self.blocksize
 
     def encrypt(self,data):
-
-        data = self.padder.enpad(data)
         datalen = len(data)
+        if datalen % self.blocksize != 0:
+            raise Exception("ECB encrypt error: supplied data length(%d) is not integer multiple of %d." % (datalen,self.blocksize))
         
         blocks = struct.unpack(self.splitcmd * (datalen / self.blocksize), data)
         result = []
@@ -139,7 +111,7 @@ class mode_ecb(object):
         for block in blocks:
             result.append(self.cipher.decrypt(block))
 
-        return self.padder.depad("".join(result))
+        return "".join(result)
 
 class xipher(object):
 
@@ -155,9 +127,9 @@ class xipher(object):
             raise Exception("This packager requires a package key of %d bytes." % rijndael.key_size)
         tool = mode_cbc(rijndael.Rijndael(self.packagekey), rijndael.block_size)
         if enpack:
-            return tool.encrypt(data).encode('base64')
+            return tool.encrypt(data)
         else:
-            return tool.decrypt(data.decode('base64'))
+            return tool.decrypt(data)
 
     encrypt_chain = []
 
@@ -184,7 +156,7 @@ class xipher(object):
             shifting_first = shifting_list[0]
             shifting_list = shifting_list[1:]
             shifting_list.append(shifting_first)
-
+        
         self.decrypt_chain = self.encrypt_chain[:]
         self.decrypt_chain.reverse()
 
@@ -195,29 +167,38 @@ class xipher(object):
             self.packagekey = packagekey
 
     def encrypt(self, data):
-        package_ctl = 0
+        maxblocksize= 16
+        base64_ctl = "F"
         # Decide if use zlib
         compressed = zlib.compress(data,9)
         if len(compressed) / len(data) < 0.75:
             data = compressed.encode('base64')
-            package_ctl += 1
+            base64_ctl = "T"
+        
+        datalen     = len(data)
+        padding_len = maxblocksize - (datalen + 2) % maxblocksize
 
-        data = chr(package_ctl) + data
+        prefix = base64_ctl + chr(padding_len)
+        # Pad
+        for i in range(0,padding_len):
+            prefix += chr(random.randint(0,255))
+
+        data = prefix + data
         for tool in self.encrypt_chain:
             data = tool.encrypt(data)
-        
         return self.package(data)
     def decrypt(self, data):
         data = self.package(data,False)
 
         for tool in self.decrypt_chain:
-#            print "data length: %d" % len(data)
+            #print "data length: %d" % len(data)
             data = tool.decrypt(data)
 
-        package_ctl = ord(data[0])
-        data = data[1:]
+        base64_ctl  = data[0]
+        padding_len = ord(data[1])
+        data = data[2 + padding_len:]
 
-        if package_ctl & 0x01:
+        if base64_ctl == "T":
             data = zlib.decompress(data.decode('base64'))
         return data
 
@@ -226,8 +207,12 @@ class xipher(object):
 
 
 if __name__ == "__main__":
-    key = "d" * 128
-    text = "d" * 64#open("rijndael.py").read()# + open("rijndael.py").read()"""
+    key = ''
+    for i in range(0,128):
+        key += chr(random.randint(0,255))
+    text = ''#c' * 63
+    for i in range(0,64):
+        text += chr(random.randint(0,255))
     xi = xipher(key)
 #    print len(text)
 #    exit()
@@ -242,9 +227,11 @@ if __name__ == "__main__":
     print "Ciphertext Length: %d" % len(enc)
 #    print enc.encode('base64')
 #    print "Encrypted length = %d." % len(enc)
+    xi = xipher(key)
+    print enc.encode('base64')
     dec = xi.decrypt(enc)
 #    print dec
-    print len(dec)
+    print "Decrypted Length: %d" % len(dec)
     if dec != text:
         raise Exception("Error decrypting.")
     stop = time.time()
