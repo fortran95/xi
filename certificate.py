@@ -27,7 +27,8 @@
         有效日期
 """
 import random,time,os,json,uuid,shelve
-import publickeyalgo,signature
+import publickeyalgo,signature,ciphers
+from M2Crypto.util import passphrase_callback
 from hashes import Hash
 
 def hashable_json(input):
@@ -71,10 +72,12 @@ class certificate(object):
         
         # After generated, load this cert. into the instance.
 
-    def save_private_text(self,filename):
+    def save_private_text(self,filename,pinreader=passphrase_callback):
         if not self.is_ours:
             raise Exception("Trying to save private info of a public certificate.")
 
+        if os.path.isfile(filename):
+            os.remove(filename)
         savesh = shelve.open(filename,writeback=True)
         savesh.clear()
 
@@ -97,8 +100,38 @@ class certificate(object):
         # final
         savesh.sync()
         savesh.close()
-    def load_private_text(self,filename):
+
+        """
+        if pinreader != None:
+            passphrase = pinreader(True)
+            key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
+            print key.encode('base64')
+            encryptor = ciphers.xipher(key)
+            shcontent = encryptor.encrypt(open(filename,'r').read()).encode('base64')
+            os.remove(filename)
+            open(filename,'w').write(shcontent)
+        """
+
+    def load_private_text(self,filename,pinreader=passphrase_callback):
+        #try:
         loadsh = shelve.open(filename)
+        """
+        except:
+            if pinreader != None:
+                try:
+                    passphrase = pinreader(True)
+                    key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
+                    print key.encode('base64')
+                    decryptor = ciphers.xipher(key)
+                    shcontent = decryptor.decrypt(open(filename,'r').read().decode('base64'))
+                    open(filename + '.temp','w').write(shcontent)
+                    loadsh = shelve.open(filename + '.temp')
+                except Exception,e:
+                    raise Exception("Unable to decrypt given file: %s" % e)
+            else:
+                raise Exception("Unable to load given file.")
+        """
+
         try:
             if loadsh['Title'] != 'Xi_Certificate_Private':
                 raise Exception("Seems not a Xi Project Certificate Private info.")
@@ -244,6 +277,9 @@ class certificate(object):
 
                 if int(c['Issue_UTC']) + int(c['Valid_To']) < time.time() + time.timezone:
                     raise Exception("Given signature already expired.")
+
+                if not int(c['Trust_Level']) in range(-3,4):
+                    raise Exception("Invalid trust level in the given signature.")
 
                 if loading: # 正在进行的是对一个证书载入新的签名
                     if c['Certified_ID'] != self.get_id():
@@ -429,15 +465,49 @@ class certificate(object):
         except Exception,e:
             raise Exception("Certificate format is bad: %s" % e)
 
+    def _encryptor(self,message,key):
+        if len(key) < 128:
+            key = Hash('sha512',key).digest() + Hash('whirlpool',key).digest()
+        xi = ciphers.xipher(key)
+        return xi.encrypt(message)
+    def _decryptor(self,message,key):
+        if len(key) < 128:
+            key = Hash('sha512',key).digest() + Hash('whirlpool',key).digest()
+        xi = ciphers.xipher(key)
+        return xi.decrypt(message)
 
+    def public_encrypt(self,data,raw=True):
+        keyindex = 1
+        keyparts = {}
+        tempkey = ''
+        
+        for k in self.keys:
+            pka = publickeyalgo.PublicKeyAlgorithm(k.get_publickey())
+
+            # 加密部分密钥
+            randomkey = ''
+            for i in range(0,64):
+                randomkey += chr(random.randint(0,255))
+            tempkey += randomkey
+            keyparts[keyindex] = json.loads(pka.encrypt(randomkey,self._encryptor))
+            
+
+            keyindex += 1
+        
+        ciphertext = self._encryptor(data,tempkey)
+        
+        ret = {'Title':'Certificate_Encrypted','Key_Parts':keyparts,'Ciphertext':ciphertext.encode('base64')}
+        if not raw:
+            ret = json.dumps(ret)
+
+        return ret
+    def private_decrypt(self,data):
+        pass
 if __name__ == "__main__":
-    parent = certificate()
-    parent.load_private_text('example2')
+    c = certificate()
+    c.generate('ALICE',level=9,bits=1024)
+#    c.save_private_text('alice.private')
 
-    child = certificate()
-    child.generate('Some lowest certificate',level=0,bits=1024)
-    parent.sign_certificate(child)
-
-    child.save_private_text('sl.prv')
-
-    print child.get_public_text()
+#    d = certificate()
+#    d.load_private_text('alice.private')
+    print c.public_encrypt('a' * 1025,True)

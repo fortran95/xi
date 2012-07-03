@@ -11,7 +11,11 @@ class PublicKeyAlgorithm(object):
 
     def __init__(self,keystr):
         try:
-            j = json.loads(keystr)
+            if type(keystr) == str:
+                j = json.loads(keystr)
+            else:
+                j = keystr
+
             if j['type'] == 'RSA_Public_Key':
                 self.key = _RSA()
                 self.is_private_key = False
@@ -26,13 +30,15 @@ class PublicKeyAlgorithm(object):
                 self.is_private_key = True
             else:
                 raise Exception("Unrecognized type of public key.")
+            
+            keystr = json.dumps(j)
 
             if self.is_private_key:
                 self.key.load_privatekey(keystr)
             else:
                 self.key.load_publickey(keystr)
-        except:
-            pass
+        except Exception,e:
+            raise Exception("Failed initilizing PublicKeyAlgorithm: %s" % e)
 
     def get_publickey(self,raw=False):
         return self.key.get_publickey(raw)
@@ -91,7 +97,7 @@ class _RSA(object):
             return False
         # Generate a temp key and encrypt it using RSA.
         tempkey = ''
-        maxlen = int(self.bits * 0.75 / 8)
+        maxlen = int(self.bits * 0.5 / 8)
         for i in range(0,maxlen):
             tempkey += chr(random.randint(0,255))
         # encrypt the message using tempkey.
@@ -416,12 +422,11 @@ class _EC(object):
         publickey = open(filename).read()
         os.remove(filename)
         # Return with json.
-        publickey = publickey.encode('base64')
         ret = json.dumps(
             {
                 'type':'EC_Encrypted',
-                'public_key':publickey,
-                'ciphertext':ciphertext,
+                'public_key':publickey.encode('base64'),
+                'ciphertext':ciphertext.encode('base64'),
             }
         )
         return ret
@@ -433,7 +438,7 @@ class _EC(object):
             if j['type'] != 'EC_Encrypted':
                 raise Exception("Input may not be the intending ciphertext.")
             publickey = j['public_key'].decode('base64')
-            ciphertext= j['ciphertext']
+            ciphertext= j['ciphertext'].decode('base64')
         except:
             raise Exception("Bad ciphertext format.")
         try:
