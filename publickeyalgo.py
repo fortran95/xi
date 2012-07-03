@@ -114,13 +114,16 @@ class _RSA(object):
         if self._key == None:
             return False
         try:
-            j = json.loads(ciphertext)
+            if type(j) == str:
+                j = json.loads(ciphertext)
+            else:
+                j = ciphertext
             if j['type'] != 'RSA_Encrypted':
                 raise Exception("Input may not be the intending ciphertext.")
             tempkey = j['tkey'].decode('base64')
             ciphertext= j['ciphertext'].decode('base64')
         except:
-            raise Exception("Bad ciphertext format.")
+            raise Exception("Bad RSA ciphertext format.")
         try:
             tempkey = self._key.private_decrypt(tempkey,4)
         except Exception,e:
@@ -434,13 +437,16 @@ class _EC(object):
         if self._key == None:
             return False
         try:
-            j = json.loads(ciphertext)
+            if type(ciphertext) == str:
+                j = json.loads(ciphertext)
+            else:
+                j = ciphertext
             if j['type'] != 'EC_Encrypted':
                 raise Exception("Input may not be the intending ciphertext.")
             publickey = j['public_key'].decode('base64')
             ciphertext= j['ciphertext'].decode('base64')
-        except:
-            raise Exception("Bad ciphertext format.")
+        except Exception,e:
+            raise Exception("Bad EC ciphertext format.")
         try:
             # Read the temp. key. First write to a file.
             filename = tempfilename()

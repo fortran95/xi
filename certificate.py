@@ -496,13 +496,34 @@ class certificate(object):
         
         ciphertext = self._encryptor(data,tempkey)
         
-        ret = {'Title':'Certificate_Encrypted','Key_Parts':keyparts,'Ciphertext':ciphertext.encode('base64')}
+        ret = {'Title':'Certificate_Encrypted_Text','Certificate_ID':self.get_id(),'Key_Parts':keyparts,'Ciphertext':ciphertext.encode('base64')}
         if not raw:
             ret = json.dumps(ret)
 
         return ret
     def private_decrypt(self,data):
-        pass
+        if not self.is_ours:
+            raise Exception("This is a public certificate and cannot be used for decrypting.")
+        try:
+            if type(data) == str:
+                j = json.loads(data)
+            else:
+                j = data
+            if j['Title'] != 'Certificate_Encrypted_Text':
+                raise Exception("Not a encrypted text.")
+            if j['Certificate_ID'] != self.get_id():
+                raise Exception("Not for this certificate to decrypt.")
+            ciphertext = j['Ciphertext'].decode('base64')
+            keyparts   = j['Key_Parts']
+
+            tempkey = ''
+            for sqid in keyparts:
+                pka = publickeyalgo.PublicKeyAlgorithm(self.keys[sqid - 1].get_privatekey(False))
+                randomkey = pka.decrypt(keyparts[sqid],self._decryptor)
+                tempkey += randomkey
+            print "Tempkey is: %s" % tempkey
+        except Exception,e:
+            raise Exception("Decrypting Failure: %s" % e)
 if __name__ == "__main__":
     c = certificate()
     c.generate('ALICE',level=9,bits=1024)
@@ -510,4 +531,5 @@ if __name__ == "__main__":
 
 #    d = certificate()
 #    d.load_private_text('alice.private')
-    print c.public_encrypt('a' * 1025,True)
+    ped = c.public_encrypt('a' * 1025,True)
+    print c.private_decrypt(ped)
