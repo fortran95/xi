@@ -60,6 +60,7 @@ class Rijndael:
     
     def __init__(self, key=None):
         self.ctx = RijndaelCTX()
+        #print "Rijndael: Set key [%s]." % key.encode('hex')
         if key:
             self.set_key(key)
             
@@ -77,6 +78,7 @@ class Rijndael:
             data = data[BLOCK_SIZE:]
         return plain
     def encrypt(self, data):
+        #print "Rijndael: Accepted plaintext [%s]." % data.encode('hex')
         dlen = len(data)
         if dlen % BLOCK_SIZE:
             raise ValueError, "data must be multiple of %d" % BLOCK_SIZE

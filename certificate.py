@@ -466,27 +466,27 @@ class certificate(object):
             raise Exception("Certificate format is bad: %s" % e)
 
     def _encryptor(self,key,message):
-        from ciphers.xxtea import XXTEA
-        e = XXTEA(Hash('md5',key).digest())
-        return e.encrypt(message.encode('hex').encode('hex'))
-
-        print "Encrypted with '%s'" % Hash('md5',key).hexdigest()
-        #return message.encode('base64')
         if len(key) < 128:
             key = Hash('sha512',key).digest() + Hash('whirlpool',key).digest()
-        xi = ciphers.xipher(key)
-        return xi.encrypt(message)
-    def _decryptor(self,key,message):
-        from ciphers.xxtea import XXTEA
-        d = XXTEA(Hash('md5',key).digest())
-        return d.decrypt(message).decode('hex').decode('hex')
+       
+        print "encrypt with: %s" % Hash('md5',key).hexdigest()
 
-        print "Decrypted with '%s'" % Hash('md5',key).hexdigest()
-        #return message.decode('base64')
+        xi = ciphers.xipher(key)
+
+        ctext = xi.encrypt(message)
+        ctext = ctext.encode('base64')
+        return ctext
+    def _decryptor(self,key,ciphertext):
+        ciphertext = ciphertext.decode('base64')
+
         if len(key) < 128:
             key = Hash('sha512',key).digest() + Hash('whirlpool',key).digest()
+        
+        print "decrypt with: %s" % Hash('md5',key).hexdigest()
+
         xi = ciphers.xipher(key)
-        return xi.decrypt(message)
+
+        return xi.decrypt(ciphertext)
 
     def public_encrypt(self,data,raw=True):
         keyindex = 1
@@ -547,7 +547,13 @@ class certificate(object):
         except Exception,e:
             raise Exception("Decrypting Failure: %s" % e)
 if __name__ == "__main__":
+
+
     c = certificate()
+
+    print c._decryptor('key',c._encryptor('key','hello,world!'))
+
+    exit()
     c.generate('ALICE',level=9,bits=1024)
 #    c.save_private_text('alice.private')
 

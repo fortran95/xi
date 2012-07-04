@@ -13,7 +13,7 @@ import struct
 import types
 
 key_size = 16
-block_size = 8
+block_size = 16
 
 def raw_xxtea(v, n, k):
     assert type(v) == type([])

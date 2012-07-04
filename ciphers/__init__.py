@@ -1,140 +1,21 @@
 # -*- coding: utf-8 -*-
 
-import struct,random,zlib
+import struct,random,zlib,math,copy
 import blowfish, rijndael, twofish, serpent, xxtea
-
-class mode_cbc(object):
-    def __init__(self,cipher,blocksize=16):
-
-        self.cipher = cipher
-        self.blocksize = blocksize
-        
-        self.splitcmd = "%ds" % self.blocksize
-    def _block_xor(self,block1, block2):
-        ret = ''
-        for i in range(0,self.blocksize):
-            ret += chr( ord(block1[i:i+1]) ^ ord(block2[i:i+1]) )
-        return ret
-
-    def encrypt(self,data):
-        datalen = len(data)
-
-        if datalen % self.blocksize != 0:
-            raise Exception("CBC mode error: supplied data length(%d) is not integer multiple of %d." % (datalen,self.blocksize))
-        
-        blocks = struct.unpack(self.splitcmd * (datalen / self.blocksize), data)
-        iv = ''
-        for i in range(0,self.blocksize):
-            iv += chr(random.randint(0,255))
-
-        result = [iv,]
-        cbc_mac = '\x00' * self.blocksize
-        
-        lastblock = iv
-        for block in blocks:
-            cblock = self.cipher.encrypt(block)
-            nblock = self._block_xor(lastblock, cblock)
-
-            cbc_mac = self.cipher.encrypt(self._block_xor(cbc_mac, block))
-
-            lastblock = nblock
-            result.append(nblock)
-
-        result.append(cbc_mac) # APPEND the CBC_MAC value.
-
-        return "".join(result)
-
-    def decrypt(self,data):
-        if data == False:
-            return False
-        
-        datalen = len(data)
-        if datalen % self.blocksize != 0:
-            raise Exception("Invalid ciphertext input.")
-
-        blocks = struct.unpack(self.splitcmd * (datalen / self.blocksize), data)
-        blocks_max_index = len(blocks) - 1
-        iv = blocks[0]
-        cbc_mac = blocks[blocks_max_index]
-
-        blocks = blocks[1:blocks_max_index]
-        result = []
-
-        lastblock = iv
-        cbc_mac2 = '\x00' * self.blocksize
-
-        for i in range(0,len(blocks)):
-            nblock = blocks[i]
-            cblock = self.cipher.decrypt(self._block_xor(lastblock,blocks[i]))
-            cbc_mac2 = self.cipher.encrypt(self._block_xor(cbc_mac2, cblock))
-            result.append(cblock)
-            lastblock = nblock
-#            result.append(self.cipher.decrypt(blocks[i]))
-        if cbc_mac2 != cbc_mac:
-            print "Because of a CBC_MAC integrity check failure, decryption cancelled."
-            return False    # Data corrupted.
-
-        return "".join(result)
-
-
-class mode_ecb(object):
-    def __init__(self,cipher,blocksize=16):
-
-        self.cipher = cipher
-        self.blocksize = blocksize
-        self.splitcmd = "%ds" % self.blocksize
-
-    def encrypt(self,data):
-        datalen = len(data)
-        if datalen % self.blocksize != 0:
-            raise Exception("ECB encrypt error: supplied data length(%d) is not integer multiple of %d." % (datalen,self.blocksize))
-        
-        blocks = struct.unpack(self.splitcmd * (datalen / self.blocksize), data)
-        result = []
-        
-        for block in blocks:
-            result.append(self.cipher.encrypt(block))
-        
-        return "".join(result)
-
-    def decrypt(self,data):
-        if data == False:
-            return False
-
-        datalen = len(data)
-        if datalen % self.blocksize != 0:
-            raise Exception("Invalid ciphertext input. Data length: %d" % datalen)
-
-        blocks = struct.unpack(self.splitcmd * (datalen / self.blocksize), data)
-        result = []
-
-        for block in blocks:
-            result.append(self.cipher.decrypt(block))
-
-        return "".join(result)
 
 class xipher(object):
 
     cipherlist = [
-        [serpent.Serpent,   serpent.key_size,  serpent.block_size],
-        [twofish.Twofish,   twofish.key_size,  twofish.block_size],
-        [rijndael.Rijndael, rijndael.key_size, rijndael.block_size],
-#        [xxtea.XXTEA,       xxtea.key_size,    xxtea.block_size],
-        [blowfish.Blowfish, blowfish.key_size, blowfish.block_size],
+        [serpent.Serpent,   serpent.key_size,  ],
+        [twofish.Twofish,   twofish.key_size   ],
+        [rijndael.Rijndael, rijndael.key_size  ],
+        [xxtea.XXTEA,       xxtea.key_size,    ],
+#        [blowfish.Blowfish, blowfish.key_size, blowfish.block_size],
     ]
-    def package(self, data, enpack=True):
-        if len(self.packagekey) != rijndael.key_size:
-            raise Exception("This packager requires a package key of %d bytes." % rijndael.key_size)
-        tool = mode_cbc(rijndael.Rijndael(self.packagekey), rijndael.block_size)
-        if enpack:
-            return tool.encrypt(data)
-        else:
-            return tool.decrypt(data)
+    blocksize  = 16
+    ivsize = 8
 
     encrypt_chain = []
-
-    def get_version(self):
-        return 1
 
     def __init__(self, key, packagekey=None):
 
@@ -146,95 +27,124 @@ class xipher(object):
             raise Exception("Key too short. At least %d bytes required." % keylen)
         
         shifting_list = self.cipherlist[:]
+        self.encrypt_chain = []
         for i in range(0,len(self.cipherlist)):
             keyring = key[:]
             for x in shifting_list:
-                cipher = x[0](keyring[0:x[1]])
+                #print "New Cipher:%20s with key: %s" % (str(x[0]),keyring[0:x[1]].encode('hex'))
+                
+                self.encrypt_chain.append((x[0],keyring[0:x[1]]))
+
                 keyring = keyring[x[1]:]
-                tool = mode_ecb(cipher, x[2])
-                self.encrypt_chain.append(tool)
+                #break
+            #break
             shifting_first = shifting_list[0]
             shifting_list = shifting_list[1:]
             shifting_list.append(shifting_first)
-        
-        self.decrypt_chain = self.encrypt_chain[:]
-        self.decrypt_chain.reverse()
 
         if packagekey == None:
             import hashlib
             self.packagekey = hashlib.sha256(key).digest()
         else:
             self.packagekey = packagekey
-
-    def encrypt(self, data):
-        maxblocksize= 16
-        base64_ctl = "F"
-        # Decide if use zlib
-        compressed = zlib.compress(data,9)
-        if len(compressed) / len(data) < 0.75:
-            data = compressed.encode('base64')
-            base64_ctl = "T"
-        
-        datalen     = len(data)
-        padding_len = maxblocksize - (datalen + 2) % maxblocksize
-
-        prefix = base64_ctl + chr(padding_len)
-        # Pad
-        for i in range(0,padding_len):
-            prefix += chr(random.randint(0,255))
-
-        data = prefix + data
-        for tool in self.encrypt_chain:
-            data = tool.encrypt(data)
-        return self.package(data)
-    def decrypt(self, data):
-        data = self.package(data,False)
-
-        for tool in self.decrypt_chain:
-            #print "data length: %d" % len(data)
-            data = tool.decrypt(data)
-
-        base64_ctl  = data[0]
-        padding_len = ord(data[1])
-        data = data[2 + padding_len:]
-
-        if base64_ctl == "T":
-            data = zlib.decompress(data.decode('base64'))
+    def _encrypt_block(self,data):
+        length = len(self.encrypt_chain)
+        #print "Encrypt Block: %s" % data.encode('hex')
+        #print "Encrypt Chain has %d items." % length
+        for i in range(0,length):
+            #for tool in self.encrypt_chain:
+            tool = self.encrypt_chain[i]
+            data = tool[0](tool[1]).encrypt(data)
         return data
+    def _xor_stream(self,stream,data):
+        datalen = len(data)
+        if len(stream) < datalen:
+            raise Exception("Length of bitstream is not sufficient.")
+        result = ''
+        for i in range(0,datalen):
+            result += chr(ord(stream[i]) ^ ord(data[i]))
+        return result
+    def keystream(self,times,iv):
+        #print "Generating keystream of %d times basing on [%s]." % (times,iv.encode('hex'))
+        ret = ''
+        for i in range(0,times):
+            block = "%8s%8s" % (iv,hex(i)[2:])
+            #print block
+            ciblk = self._encrypt_block(block)
+            #print "%s -> %s" % (block.encode('hex'),ciblk.encode('hex'))
+            ret += ciblk
+
+        #print "KeyStream:" + ret.encode('hex')
+        return ret
+    def encrypt(self, data):    # Use CFB
+        iv = ''
+        for i in range(0,self.ivsize):
+            iv += chr(random.randint(0,255))
+        iv0 = iv[:]
+        
+        # generate CFB keystream
+        datalen = len(data)
+
+        times = datalen / self.blocksize
+        if datalen % self.blocksize != 0:
+            times += 1
+
+        keystream = self.keystream(times,iv)
+        
+        result = str(iv0) + str(self._xor_stream(keystream,data))
+        
+        return result
+    def decrypt(self,data):
+        # generate CFB iv
+        iv = data[0:self.ivsize].strip()
+        
+        data = data[self.ivsize:]
+        # generate CFB keystream
+        datalen = len(data)
+
+        times = datalen / self.blocksize
+        if datalen % self.blocksize != 0:
+            times += 1
+
+        keystream = self.keystream(times,iv)
+                
+        result = self._xor_stream(keystream,data)
+        return result
 
     def get_version(self):
         return 1
 
+def encryptor(key,data):
+    xi1 = xipher(key[:])
+    return xi1.encrypt(data)
 
-if __name__ == "__main__":
-    key = ''
-    for i in range(0,128):
-        key += chr(random.randint(0,255))
-    text = ''#c' * 63
-    for i in range(0,64):
-        text += chr(random.randint(0,255))
-    xi = xipher(key)
-#    print len(text)
-#    exit()
-    import time
-    start = time.time()
-    times = 1
-#    for i in range(0,times):
-    enc = xi.encrypt(text)
+def decryptor(key,data):
+    xi2 = xipher(key[:])
+    return xi2.decrypt(data)
 
-#    enc = enc[0:10] + 'a' + enc[11:]
-    print "Plaintext Length:  %d" % len(text)
-    print "Ciphertext Length: %d" % len(enc)
-#    print enc.encode('base64')
-#    print "Encrypted length = %d." % len(enc)
-    xi = xipher(key)
-    print enc.encode('base64')
-    dec = xi.decrypt(enc)
-#    print dec
-    print "Decrypted Length: %d" % len(dec)
-    if dec != text:
-        raise Exception("Error decrypting.")
-    stop = time.time()
+if __name__ == "__main__":    
+    key = '\x10' * 128
+#    for i in range(0,128):
+#        key += chr(random.randint(0,255))
+    text = """
+    ***** * ' * 3
+   
+    
+    xi1 = xipher(key)
+    xi2 = xipher(key)
 
-    print "Time cost: %f" % (stop - start)
-    print "Average speed: %f Bytes/s." % (len(text) * times * 2 / (stop - start))
+    #enc1 = xi1.encrypt('text')
+    #enc1 = xi1.encrypt(text)
+    enc2 = xi2.encrypt(text)
+
+    #print xi2.decrypt(enc1)
+    print xi1.decrypt(enc2)
+    """
+    #exit()
+    #print xi2.decrypt(xi1.encrypt(text))
+    enc = encryptor(key,text)
+    #print enc
+    print '- ' * 40
+    dec = decryptor(key,enc)
+
+    print dec == text
