@@ -466,23 +466,22 @@ class certificate(object):
             raise Exception("Certificate format is bad: %s" % e)
 
     def _encryptor(self,key,message):
+#        print key.encode('hex')
         if len(key) < 128:
             key = Hash('sha512',key).digest() + Hash('whirlpool',key).digest()
        
-        print "encrypt with: %s" % Hash('md5',key).hexdigest()
+#        print "encrypt with: %s" % Hash('md5',key).hexdigest()
 
         xi = ciphers.xipher(key)
 
         ctext = xi.encrypt(message)
-        ctext = ctext.encode('base64')
         return ctext
     def _decryptor(self,key,ciphertext):
-        ciphertext = ciphertext.decode('base64')
-
+#        print key.encode('hex')
         if len(key) < 128:
             key = Hash('sha512',key).digest() + Hash('whirlpool',key).digest()
         
-        print "decrypt with: %s" % Hash('md5',key).hexdigest()
+#        print "decrypt with: %s" % Hash('md5',key).hexdigest()
 
         xi = ciphers.xipher(key)
 
@@ -500,19 +499,28 @@ class certificate(object):
             randomkey = ''
             for i in range(0,64):
                 randomkey += chr(random.randint(0,255))
+            randomkey = randomkey.encode('base64').replace('\n','')
             tempkey.append(randomkey)
             keyparts[keyindex] = json.loads(pka.encrypt(randomkey,self._encryptor))
 
             keyindex += 1
 
         tempkey.sort()
-        print "Before generation:"
-        print tempkey
+        #print "Before generation:"
+        #print tempkey
         tempkey = "".join(tempkey)
+
+        keydigest = Hash('md5',tempkey).digest()
         
         ciphertext = self._encryptor(tempkey,data)
         
-        ret = {'Title':'Certificate_Encrypted_Text','Certificate_ID':self.get_id(),'Key_Parts':keyparts,'Ciphertext':ciphertext.encode('base64')}
+        ret = {
+            'Title':'Certificate_Encrypted_Text',
+            'Certificate_ID':self.get_id(),
+            'Key_Parts':keyparts,
+            'Ciphertext':ciphertext.encode('base64'),
+            'Key_Digest':keydigest.encode('base64'),
+            }
         if not raw:
             ret = json.dumps(ret)
         return ret
@@ -530,6 +538,7 @@ class certificate(object):
                 raise Exception("Not for this certificate to decrypt.")
             ciphertext = j['Ciphertext'].decode('base64')
             keyparts   = j['Key_Parts']
+            keydigest  = j['Key_Digest'].decode('base64')
 
             tempkey = []
             for sqid in keyparts:
@@ -539,26 +548,35 @@ class certificate(object):
                 tempkey.append(randomkey)
             
             tempkey.sort()
-            print "After generation:"
-            print tempkey
+#            print "After generation:"
+#            print tempkey
             tempkey = "".join(tempkey)
 
+            if Hash('md5',tempkey).digest() != keydigest:
+                raise Exception("Failed to recover transfer key. Key exchanging failed.")
+            #print tempkey.encode('hex')
             return self._decryptor(tempkey,ciphertext)
         except Exception,e:
             raise Exception("Decrypting Failure: %s" % e)
 if __name__ == "__main__":
-
-
+    failure = 0
     c = certificate()
+    c.generate('ALICE',level=100,bits=4096)
+    for i in range(0,100):
+        print '##########################'
+        try:
 
-    print c._decryptor('key',c._encryptor('key','hello,world!'))
+#    print c._decryptor('key',c._encryptor('key','hello,world!'))
 
-    exit()
-    c.generate('ALICE',level=9,bits=1024)
-#    c.save_private_text('alice.private')
-
-#    d = certificate()
+#    exit()
+#    print c.get_public_text()
 #    d.load_private_text('alice.private')
-    ped = c.public_encrypt('a' * 10,True)
-    #print ped
-    print c.private_decrypt(ped)
+            text = ''
+            for j in range(0,128):
+                text += chr(random.randint(0,255))
+            ped = c.public_encrypt(text,True)
+#    print ped
+            print c.private_decrypt(ped)
+        except:
+            failure += 1
+    print "Failed %d times." % failure

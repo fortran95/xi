@@ -17,7 +17,7 @@ class xipher(object):
 
     encrypt_chain = []
 
-    def __init__(self, key, packagekey=None):
+    def __init__(self, key):
 
         keylen = 0
         for x in self.cipherlist:
@@ -42,11 +42,6 @@ class xipher(object):
             shifting_list = shifting_list[1:]
             shifting_list.append(shifting_first)
 
-        if packagekey == None:
-            import hashlib
-            self.packagekey = hashlib.sha256(key).digest()
-        else:
-            self.packagekey = packagekey
     def _encrypt_block(self,data):
         length = len(self.encrypt_chain)
         #print "Encrypt Block: %s" % data.encode('hex')
@@ -67,19 +62,17 @@ class xipher(object):
     def keystream(self,times,iv):
         #print "Generating keystream of %d times basing on [%s]." % (times,iv.encode('hex'))
         ret = ''
+        block = ''
         for i in range(0,times):
-            block = "%8s%8s" % (iv,hex(i)[2:])
-            #print block
-            ciblk = self._encrypt_block(block)
-            #print "%s -> %s" % (block.encode('hex'),ciblk.encode('hex'))
-            ret += ciblk
+            block += "%8s%8s" % (iv,hex(i)[2:])
 
-        #print "KeyStream:" + ret.encode('hex')
-        return ret
+        ciblk = self._encrypt_block(block)
+
+        #print "KeyStream:" + ciblk
+        return ciblk
     def encrypt(self, data):    # Use CFB
-        iv = ''
-        for i in range(0,self.ivsize):
-            iv += chr(random.randint(0,255))
+        iv = hex(abs(int(zlib.crc32(data))))[2:10]
+        
         iv0 = iv[:]
         
         # generate CFB keystream
@@ -90,6 +83,7 @@ class xipher(object):
             times += 1
 
         keystream = self.keystream(times,iv)
+        #print "KeyStream:" + keystream.encode('hex')
         
         result = str(iv0) + str(self._xor_stream(keystream,data))
         
@@ -109,7 +103,12 @@ class xipher(object):
         keystream = self.keystream(times,iv)
                 
         result = self._xor_stream(keystream,data)
-        return result
+        digest = hex(abs(int(zlib.crc32(result))))[2:10]
+
+        if digest == iv:
+            return result
+        else:
+            raise Exception("Cannot decrypt. Data corrupted or incorrect key.")
 
     def get_version(self):
         return 1
@@ -123,28 +122,43 @@ def decryptor(key,data):
     return xi2.decrypt(data)
 
 if __name__ == "__main__":    
-    key = '\x10' * 128
-#    for i in range(0,128):
-#        key += chr(random.randint(0,255))
-    text = """
-    ***** * ' * 3
-   
     
-    xi1 = xipher(key)
-    xi2 = xipher(key)
+    fail = 0
+    for t in range(0,1000):
+        text = ''
+        key = ''
+        for i in range(0,128):
+            key += chr(random.randint(0,255))
+        for j in range(0,random.randint(128,256)):
+            text += chr(random.randint(0,255))
+    
+        xi1 = xipher(key)
+        xi2 = xipher(key)
 
-    #enc1 = xi1.encrypt('text')
-    #enc1 = xi1.encrypt(text)
-    enc2 = xi2.encrypt(text)
+        try:
+            enc1 = xi1.encrypt(text)
+            dec1 = xi2.decrypt(enc1)
+        except:
+            print '*'
+            fail += 1
+        print t
+    print "Failed %d times of 1000 tests." % fail
 
-    #print xi2.decrypt(enc1)
-    print xi1.decrypt(enc2)
     """
     #exit()
     #print xi2.decrypt(xi1.encrypt(text))
-    enc = encryptor(key,text)
-    #print enc
-    print '- ' * 40
-    dec = decryptor(key,enc)
+    import time
+    a = time.time()
+    c = 1000
+    for i in range(0,c):
+        enc = encryptor(key,text)
+        #print enc
+        dec = decryptor(key,enc)
+        if dec != text:
+            print "-------- ERROR! --------"
+            print key.encode('hex')
+            print enc[0:16].encode('hex')
+    b = time.time()
 
-    print dec == text
+    print "Average is: %f" % (c * 1.0 * len(text) / (b-a))
+    """

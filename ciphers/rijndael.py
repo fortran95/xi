@@ -406,7 +406,7 @@ def decrypt(rinst, buff):
 # Tests.
 #
 
-if BLOCK_SIZE == 16:
+if __name__ == "__main__" and BLOCK_SIZE == 16:
     assert Rijndael('012345678abcdefgh00112233xyzqwer').encrypt('a'*16) == '%\x98\x8a \xf8\\\x10\x9c\x17\x16\x9bb\x9e\xd6*\x96'
     assert Rijndael('012345678abcdefgh00112233xyzqwer').decrypt('%\x98\x8a \xf8\\\x10\x9c\x17\x16\x9bb\x9e\xd6*\x96') == 'a'*16
     assert Rijndael('\x10'*32).encrypt('1234'*4) == '\xba\xad\xaawV|S\xc36>1\x03\xfd\x9e+\x9d'
