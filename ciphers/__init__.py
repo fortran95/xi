@@ -46,10 +46,12 @@ class xipher(object):
         length = len(self.encrypt_chain)
         #print "Encrypt Block: %s" % data.encode('hex')
         #print "Encrypt Chain has %d items." % length
+        data0 = data[:]
         for i in range(0,length):
             #for tool in self.encrypt_chain:
             tool = self.encrypt_chain[i]
             data = tool[0](tool[1]).encrypt(data)
+        #print data0.encode('hex') + ' -> ' + data.encode('hex')
         return data
     def _xor_stream(self,stream,data):
         datalen = len(data)
@@ -71,7 +73,12 @@ class xipher(object):
         #print "KeyStream:" + ciblk.encode('hex')
         return ciblk
     def encrypt(self, data):    # Use CFB
-        iv = hex(abs(int(zlib.crc32(data))))[2:10]
+        rand = ''
+        for i in range(0,self.blocksize / 4 * 3):
+            rand += chr(random.randint(0,255))
+        rand = rand.encode('base64')[0:self.blocksize]
+
+        iv = hex(abs(int(zlib.crc32(rand + data))))[2:2+self.ivsize]
         if len(iv) < self.ivsize:
             iv += (self.ivsize - len(iv)) * '*'
         
@@ -87,10 +94,12 @@ class xipher(object):
         keystream = self.keystream(times,iv)
         #print "KeyStream:" + keystream.encode('hex')
         
-        result = str(iv0) + str(self._xor_stream(keystream,data))
+        result = rand + str(iv0) + str(self._xor_stream(keystream,data))
         
         return result
     def decrypt(self,data):
+        rand = data[0:self.blocksize]
+        data = data[self.blocksize:]
         # generate CFB iv
         iv = data[0:self.ivsize].strip()
         
@@ -105,13 +114,13 @@ class xipher(object):
         keystream = self.keystream(times,iv)
                 
         result = self._xor_stream(keystream,data)
-        digest = hex(abs(int(zlib.crc32(result))))[2:10]
+        digest = hex(abs(int(zlib.crc32(rand + result))))[2:10]
         #if len(digest) < self.ivsize:
         #    digest += (self.ivsize - len(iv)) * '*'
          
 
         if digest == iv[0:len(digest)]:
-            print 'verified.'
+            #print 'verified.'
             return result
         else:
             raise Exception("Cannot decrypt. Data corrupted or incorrect key.")
@@ -128,15 +137,18 @@ def decryptor(key,data):
     return xi2.decrypt(data)
 
 if __name__ == "__main__":    
-    
+    import time
+
     fail = 0
-    for t in range(0,50):
+    job = 0
+    b = time.time()
+    for t in range(0,10000):
         text = ''
         key = ''
         for i in range(0,128):
             key += chr(random.randint(0,255))
-        for j in range(0,32):
-            text += chr(random.randint(0,255))
+        for j in range(0,random.randint(128,256)):
+            text +=chr(random.randint(0,255))
     
         xi1 = xipher(key)
         xi2 = xipher(key)
@@ -146,12 +158,15 @@ if __name__ == "__main__":
             dec1 = xi2.decrypt(enc1)
             if text != dec1:
                 raise Exception('.')
+            job += len(text)
         except Exception,e:
-            print '**** %s' % e
+            print '****'
             fail += 1
-        print t
-    print "Failed %d times of 1000 tests." % fail
-
+        if t % 100 == 0:
+            print t
+    e = time.time()
+    print "Failed %d times of 10000 tests." % fail
+    print "Average speed: %f bytes / second." % (job / (e-b))
     """
     #exit()
     #print xi2.decrypt(xi1.encrypt(text))

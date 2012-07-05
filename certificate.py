@@ -101,36 +101,36 @@ class certificate(object):
         savesh.sync()
         savesh.close()
 
-        """
+        
         if pinreader != None:
             passphrase = pinreader(True)
             key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
-            print key.encode('base64')
+            #print key.encode('base64')
             encryptor = ciphers.xipher(key)
             shcontent = encryptor.encrypt(open(filename,'r').read()).encode('base64')
             os.remove(filename)
             open(filename,'w').write(shcontent)
-        """
+        
 
     def load_private_text(self,filename,pinreader=passphrase_callback):
-        #try:
-        loadsh = shelve.open(filename)
-        """
+        try:
+            loadsh = shelve.open(filename)
         except:
             if pinreader != None:
                 try:
-                    passphrase = pinreader(True)
+                    passphrase = pinreader(False)
                     key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
-                    print key.encode('base64')
+#                    print key.encode('base64')
                     decryptor = ciphers.xipher(key)
                     shcontent = decryptor.decrypt(open(filename,'r').read().decode('base64'))
                     open(filename + '.temp','w').write(shcontent)
                     loadsh = shelve.open(filename + '.temp')
                 except Exception,e:
+                    if os.path.isfile(filename + '.temp'):
+                        os.remove(filename + '.temp')
                     raise Exception("Unable to decrypt given file: %s" % e)
             else:
                 raise Exception("Unable to load given file.")
-        """
 
         try:
             if loadsh['Title'] != 'Xi_Certificate_Private':
@@ -184,11 +184,15 @@ class certificate(object):
             self.is_ours = True
 
             print "Certificate verified and loaded."
-            return True
                         
         except Exception,e:
             raise Exception("Certificate format is bad: %s" % e)
+            return False
 
+        temp = filename + '.temp'
+        if os.path.isfile(temp):
+            os.remove(temp)
+        return True
 
     # XXX 提供使用证书进行加密和签署的方法。用于给证书持有者传递信息，以及让证书持有者自己签署信息。
     # XXX  具体来说，需要提供：
@@ -562,6 +566,13 @@ if __name__ == "__main__":
     failure = 0
     c = certificate()
     c.generate('ALICE',level=100,bits=4096)
+
+    c.save_private_text('alice.private')
+
+    d = certificate()
+    d.load_private_text('alice.private')
+
+    exit()
     for i in range(0,100):
         print '##########################'
         try:
