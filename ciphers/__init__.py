@@ -68,10 +68,12 @@ class xipher(object):
 
         ciblk = self._encrypt_block(block)
 
-        #print "KeyStream:" + ciblk
+        #print "KeyStream:" + ciblk.encode('hex')
         return ciblk
     def encrypt(self, data):    # Use CFB
         iv = hex(abs(int(zlib.crc32(data))))[2:10]
+        if len(iv) < self.ivsize:
+            iv += (self.ivsize - len(iv)) * '*'
         
         iv0 = iv[:]
         
@@ -104,8 +106,12 @@ class xipher(object):
                 
         result = self._xor_stream(keystream,data)
         digest = hex(abs(int(zlib.crc32(result))))[2:10]
+        #if len(digest) < self.ivsize:
+        #    digest += (self.ivsize - len(iv)) * '*'
+         
 
-        if digest == iv:
+        if digest == iv[0:len(digest)]:
+            print 'verified.'
             return result
         else:
             raise Exception("Cannot decrypt. Data corrupted or incorrect key.")
@@ -124,12 +130,12 @@ def decryptor(key,data):
 if __name__ == "__main__":    
     
     fail = 0
-    for t in range(0,1000):
+    for t in range(0,50):
         text = ''
         key = ''
         for i in range(0,128):
             key += chr(random.randint(0,255))
-        for j in range(0,random.randint(128,256)):
+        for j in range(0,32):
             text += chr(random.randint(0,255))
     
         xi1 = xipher(key)
@@ -138,8 +144,10 @@ if __name__ == "__main__":
         try:
             enc1 = xi1.encrypt(text)
             dec1 = xi2.decrypt(enc1)
-        except:
-            print '*'
+            if text != dec1:
+                raise Exception('.')
+        except Exception,e:
+            print '**** %s' % e
             fail += 1
         print t
     print "Failed %d times of 1000 tests." % fail
