@@ -223,6 +223,7 @@ class certificate(object):
                 j = json.loads(sign)
             else:
                 j = sign
+            
             keyindex = 1
             for key in self.keys:
                 signer = signature.signature(key.get_publickey())
@@ -546,9 +547,11 @@ class certificate(object):
 
             tempkey = []
             for sqid in keyparts:
-                pka = publickeyalgo.PublicKeyAlgorithm(self.keys[sqid - 1].get_privatekey(False))
+                intsqid = int(str(sqid))
+#                print intsqid
+                pka = publickeyalgo.PublicKeyAlgorithm(self.keys[intsqid - 1].get_privatekey(False))
                 randomkey = pka.decrypt(keyparts[sqid],self._decryptor)
-                #print "   Temp Key Part(%d): %s" % (sqid,randomkey.encode('base64'))
+#                print "   Temp Key Part(%s): %s" % (sqid,randomkey.encode('base64'))
                 tempkey.append(randomkey)
             
             tempkey.sort()
@@ -565,12 +568,11 @@ class certificate(object):
 if __name__ == "__main__":
     failure = 0
     c = certificate()
-    c.generate('ALICE',level=100,bits=4096)
+    c.generate('HMX Example',level=50,bits=4096)
 
-    c.save_private_text('alice.private')
+    c.save_private_text('hmx.private')
 
-    d = certificate()
-    d.load_private_text('alice.private')
+    print c.get_public_text()
 
     exit()
     for i in range(0,100):

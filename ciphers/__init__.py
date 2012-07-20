@@ -94,7 +94,11 @@ class xipher(object):
         keystream = self.keystream(times,iv)
         #print "KeyStream:" + keystream.encode('hex')
         
+#        teststart = time.time()
         result = rand + str(iv0) + str(self._xor_stream(keystream,data))
+#        testend = time.time()
+
+#        print "Xor Time Cost: %f seconds." % (testend - teststart)
         
         return result
     def decrypt(self,data):
@@ -137,18 +141,17 @@ def decryptor(key,data):
     return xi2.decrypt(data)
 
 if __name__ == "__main__":    
-    import time
+#    import time
 
     fail = 0
     job = 0
-    b = time.time()
-    for t in range(0,10000):
+    #b = time.time()
+    for t in range(0,1):
         text = ''
         key = ''
         for i in range(0,128):
             key += chr(random.randint(0,255))
-        for j in range(0,random.randint(128,256)):
-            text +=chr(random.randint(0,255))
+        text =chr(random.randint(0,255)) * 10240
     
         xi1 = xipher(key)
         xi2 = xipher(key)
@@ -164,9 +167,9 @@ if __name__ == "__main__":
             fail += 1
         if t % 100 == 0:
             print t
-    e = time.time()
+    #e = time.time()
     print "Failed %d times of 10000 tests." % fail
-    print "Average speed: %f bytes / second." % (job / (e-b))
+    #print "Average speed: %f bytes / second." % (job / (e-b))
     """
     #exit()
     #print xi2.decrypt(xi1.encrypt(text))

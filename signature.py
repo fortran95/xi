@@ -39,10 +39,12 @@ class signature(object):
                 raise Exception("This may not be a signature.")
             digestmod = j['Digest_Method']
             signraw = j['Data'].decode('base64')
+
             if j.has_key('HMAC_Key'):
-                msghash = Hash(digestmod,message).hmac(j['HMAC_Key'].decode('base64'),True)
+                msghash = Hash(str(digestmod),str(message)).hmac(str(j['HMAC_Key']).decode('base64'),True)
             else:
                 msghash = Hash(digestmod,message).digest()
+            
         except Exception,e:
             raise Exception("Bad format of signature, error: %s" % e)
 

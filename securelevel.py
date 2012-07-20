@@ -14,12 +14,15 @@ USERCERTPATH = BASEPATH + 'user/usercerts'
 class securelevel(object):
     indexes = {}
     foreigners = [] # 记录没见过的证书ID
-    def __init__(self):
+    paths = []
+    def __init__(self,rootpath=ROOTCERTPATH):
         # 缓存证书ID-文件关系
         # 根证书储存在   user/rootcerts 下面
         # 其他证书储存在 user/usercerts 下面
-        print "Initializing Secure Consultant."
-        self.initilize()
+        if os.path.isdir(rootpath):
+            self.paths.append((rootpath,True))
+        else:
+            raise Exception("No valid root cert. path specified.")
     def trustlevel(self,consultresult,strict=False):
         # 根据 consult 的结果，计算 trustlevel
         # 如果 strict==False，则在同级签名中取信任等级最高的。
@@ -94,10 +97,12 @@ class securelevel(object):
         #print "Walk result of '%s':" % cert.subject
         #print ret
         return ret
-    def initilize(self):
+    def initilize(self,paths):
         print "Caching all known certificates."
-        self._list_certs(ROOTCERTPATH,True)
-        self._list_certs(USERCERTPATH)
+        for path in paths:
+            self.paths.append((path,False))
+        for pathtuple in self.paths:
+            self._list_certs(pathtuple[0],pathtuple[1])
     def _list_certs(self,path,isroot=False):
         listresult = os.listdir(path)
         for filename in listresult:
@@ -116,7 +121,8 @@ class securelevel(object):
             self.indexes[c_id] = (c,isroot)
 
 if __name__ == '__main__':
-    a = securelevel()
+    a = securelevel(ROOTCERTPATH)
+    a.initilize([USERCERTPATH,])
     
     c = certificate.certificate()
 
