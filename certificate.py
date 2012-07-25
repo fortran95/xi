@@ -568,9 +568,9 @@ class certificate(object):
 if __name__ == "__main__":
     failure = 0
     c = certificate()
-    c.generate('HMX Example',level=50,bits=4096)
+    c.generate('NEO Example',level=50,bits=4096,curve=734)
 
-    c.save_private_text('hmx.private')
+    c.save_private_text('neo.private')
 
     print c.get_public_text()
 

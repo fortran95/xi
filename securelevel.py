@@ -21,7 +21,7 @@ class securelevel(object):
         if os.path.isdir(rootpath):
             self.paths.append((rootpath,True))
         else:
-            raise Exception("No valid root cert. path specified.")
+            raise Exception("No valid root cert. path specified:\n  %s" % rootpath)
     def trustlevel(self,consultresult,strict=False):
         # 根据 consult 的结果，计算 trustlevel
         # 如果 strict==False，则在同级签名中取信任等级最高的。
