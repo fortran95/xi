@@ -2,6 +2,7 @@
 
 import struct,random,zlib,math,copy
 import blowfish, rijndael, twofish, serpent, xxtea
+import _derivekey
 
 class xipher(object):
 
@@ -28,8 +29,9 @@ class xipher(object):
         
         shifting_list = self.cipherlist[:]
         self.encrypt_chain = []
+        derivedkey = key[:]
         for i in range(0,len(self.cipherlist)):
-            keyring = key[:]
+            keyring = derivedkey[:]
             for x in shifting_list:
                 #print "New Cipher:%20s with key: %s" % (str(x[0]),keyring[0:x[1]].encode('hex'))
                 
@@ -38,6 +40,8 @@ class xipher(object):
                 keyring = keyring[x[1]:]
                 #break
             #break
+            #print ""
+            derivedkey = _derivekey.derive_key(derivedkey)
             shifting_first = shifting_list[0]
             shifting_list = shifting_list[1:]
             shifting_list.append(shifting_first)
@@ -141,35 +145,41 @@ def decryptor(key,data):
     return xi2.decrypt(data)
 
 if __name__ == "__main__":    
-#    import time
+    import time
 
     fail = 0
     job = 0
-    #b = time.time()
-    for t in range(0,1):
-        text = ''
+
+    times = 50
+    data = []
+    for i in range(0,times):
         key = ''
-        for i in range(0,128):
+        text = ''
+        for j in range(0,128):
             key += chr(random.randint(0,255))
-        text =chr(random.randint(0,255)) * 10240
-    
+        for j in range(0,random.randint(128,256)):
+            text += chr(random.randint(0,255))
         xi1 = xipher(key)
         xi2 = xipher(key)
+        data.append((xi1,xi2,text))
+
+    b = time.time()
+    for t in range(0,times):
 
         try:
-            enc1 = xi1.encrypt(text)
-            dec1 = xi2.decrypt(enc1)
-            if text != dec1:
+            enc1 = data[t][0].encrypt(data[t][2])
+            dec1 = data[t][1].decrypt(enc1)
+            if data[t][2] != dec1:
                 raise Exception('.')
-            job += len(text)
+            job += len(data[t][2])
         except Exception,e:
             print '****'
             fail += 1
         if t % 100 == 0:
             print t
-    #e = time.time()
+    e = time.time()
     print "Failed %d times of 10000 tests." % fail
-    #print "Average speed: %f bytes / second." % (job / (e-b))
+    print "Average speed: %f bytes / second." % (job / (e-b))
     """
     #exit()
     #print xi2.decrypt(xi1.encrypt(text))
