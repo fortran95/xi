@@ -5,11 +5,10 @@
 import os,sys
 import certificate
 
-BASEPATH = os.path.dirname(sys.argv[0])
-if BASEPATH != '':
-    BASEPATH += '/'
-ROOTCERTPATH = BASEPATH + 'user/rootcerts'
-USERCERTPATH = BASEPATH + 'user/usercerts'
+BASEPATH = os.path.realpath(os.path.dirname(sys.argv[0]))
+
+ROOTCERTPATH = os.path.join(BASEPATH,'user','rootcerts')
+USERCERTPATH = os.path.join(BASEPATH,'user','usercerts')
 
 class securelevel(object):
     indexes = {}
