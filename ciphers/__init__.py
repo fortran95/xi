@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 
-import struct,random,zlib,math,copy
+import struct,random,zlib,math,copy,logging
 import blowfish, rijndael, twofish, serpent, xxtea
 import _derivekey
+
+log = logging.getLogger('xi.ciphers.xipher')
 
 class xipher(object):
 
@@ -26,6 +28,8 @@ class xipher(object):
 
         if len(key) < keylen:
             raise Exception("Key too short. At least %d bytes required." % keylen)
+
+        log.info('Xipher initilized with key length [%s].',len(key))
         
         shifting_list = self.cipherlist[:]
         self.encrypt_chain = []
@@ -103,6 +107,7 @@ class xipher(object):
 #        testend = time.time()
 
 #        print "Xor Time Cost: %f seconds." % (testend - teststart)
+        log.info('Xipher encrypted some text.')
         
         return result
     def decrypt(self,data):
@@ -131,6 +136,9 @@ class xipher(object):
             #print 'verified.'
             return result
         else:
+            
+            log.exception('Xipher cannot decrypt given text. Data corrupted or incorrect key.')
+
             raise Exception("Cannot decrypt. Data corrupted or incorrect key.")
 
     def get_version(self):

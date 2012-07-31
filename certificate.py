@@ -31,7 +31,6 @@ import publickeyalgo,signature,ciphers
 from M2Crypto.util import passphrase_callback
 from hashes import Hash
 
-logging.basicConfig(filename='example.log',level=logging.DEBUG)
 log = logging.getLogger('xi.ceritificate')
 
 def hashable_json(input):
@@ -205,7 +204,7 @@ class certificate(object):
 
             self.is_ours = True
 
-            print "Certificate verified and loaded."
+            log.info("Private certificate verified and loaded. Subject[%s].",basic_subject)
                         
         except Exception,e:
             
@@ -498,7 +497,8 @@ class certificate(object):
 
             self.is_ours = False
 
-            log.info('Certificate successfully loaded. Subject[%s].',certid)
+            log.info('Public certificate successfully loaded. Subject[%s].',basic_subject)
+
             return True
                         
         except Exception,e:

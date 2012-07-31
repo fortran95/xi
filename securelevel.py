@@ -2,13 +2,15 @@
 
 # 提供一个咨询类，可以根据证书签名查明其可信程度
 
-import os,sys
+import os,sys,logging
 import certificate
 
 BASEPATH = os.path.realpath(os.path.dirname(sys.argv[0]))
 
 ROOTCERTPATH = os.path.join(BASEPATH,'user','rootcerts')
 USERCERTPATH = os.path.join(BASEPATH,'user','usercerts')
+
+log = logging.getLogger('xi.securelevel')
 
 class securelevel(object):
     indexes = {}
@@ -89,7 +91,7 @@ class securelevel(object):
                     continue
                 if issuer.verify_signature(sig):
                     # 得到了本证书的一个上级证书，并且通过了验证
-                    print "Verified."
+                    log.debug('verified.')
                     ret.append((issuer.get_id(),self.indexes[issuer_id][1],sig['Content']['Trust_Level']))
             else:
                 self.foreigners.append(issuer_id)
@@ -97,11 +99,15 @@ class securelevel(object):
         #print ret
         return ret
     def initilize(self,paths):
-        print "Caching all known certificates."
+
+        log.info("Caching all known certificates.")
+
         for path in paths:
             self.paths.append((path,False))
         for pathtuple in self.paths:
             self._list_certs(pathtuple[0],pathtuple[1])
+
+        log.info("Loaded all known certificates.")
     def _list_certs(self,path,isroot=False):
         listresult = os.listdir(path)
         for filename in listresult:
