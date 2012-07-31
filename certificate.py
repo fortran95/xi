@@ -26,10 +26,13 @@
         签名日期
         有效日期
 """
-import random,time,os,json,uuid,shelve
+import random,time,os,json,uuid,shelve,logging
 import publickeyalgo,signature,ciphers
 from M2Crypto.util import passphrase_callback
 from hashes import Hash
+
+logging.basicConfig(filename='example.log',level=logging.DEBUG)
+log = logging.getLogger('xi.ceritificate')
 
 def hashable_json(input):
     return json.dumps(input,sort_keys=True,indent=0,ensure_ascii=True).strip()
@@ -44,10 +47,15 @@ class certificate(object):
         pass
     def generate(self,subject,level=0,**argv):
         # Will generate a new certificate. Compatiable with NERV-XI-001 Standard.
-        
+
+        log.info("Now generating new Xi certificate: Subject[%s] Level[%s].",subject,level)
+
         # - subject
         subject = subject.strip()
         if len(subject) > 512 or len(subject) < 3:
+
+            log.exception("Required certificate subject's invalid.")
+
             raise Exception("Certificate subject is not valid.")
         self.subject = subject
         
@@ -72,8 +80,13 @@ class certificate(object):
         
         # After generated, load this cert. into the instance.
 
+        log.info("New Xi certificate generation done.")
+
     def save_private_text(self,filename,pinreader=passphrase_callback):
         if not self.is_ours:
+
+            log.exception("Attempt to save a public certificate's private info failed.")
+
             raise Exception("Trying to save private info of a public certificate.")
 
         if os.path.isfile(filename):
@@ -100,7 +113,6 @@ class certificate(object):
         # final
         savesh.sync()
         savesh.close()
-
         
         if pinreader != None:
             passphrase = pinreader(True)
@@ -111,13 +123,20 @@ class certificate(object):
             os.remove(filename)
             open(filename,'w').write(shcontent)
         
-
+        log.info("Successfully saved private info.")
     def load_private_text(self,filename,pinreader=passphrase_callback):
+        log.info("Trying to load a private certificate.")
         try:
             loadsh = shelve.open(filename)
+
+            log.info("Load as plain text with no passphrase seems OK.")
+
         except:
             if pinreader != None:
                 try:
+
+                    log.info("Load as encrypted text. Requiring passphrase.")
+
                     passphrase = pinreader(False)
                     key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
 #                    print key.encode('base64')
@@ -128,6 +147,9 @@ class certificate(object):
                 except Exception,e:
                     if os.path.isfile(filename + '.temp'):
                         os.remove(filename + '.temp')
+
+                    log.exception("Unable to decrypt given file: %s",e)
+
                     raise Exception("Unable to decrypt given file: %s" % e)
             else:
                 raise Exception("Unable to load given file.")
@@ -186,6 +208,9 @@ class certificate(object):
             print "Certificate verified and loaded."
                         
         except Exception,e:
+            
+            log.exception("Cannot load private certificate: %s",e)
+
             raise Exception("Certificate format is bad: %s" % e)
             return False
 
@@ -194,13 +219,6 @@ class certificate(object):
             os.remove(temp)
         return True
 
-    # XXX 提供使用证书进行加密和签署的方法。用于给证书持有者传递信息，以及让证书持有者自己签署信息。
-    # XXX  具体来说，需要提供：
-    #    XXX 用自己的私人证书产生给一个来自公共域的证书的签名信息(此人给出信任等级)
-    #    XXX 向一个（公有或者私有的）证书中插入来自外人的签名（验证并储存，然后可以通过get_public_text或者save_private_text储存
-    
-    # XXX  证书如果没有签名，就是可疑的。提供签名和验证签名的方法。
-    #        签名信息应当被单独列入一个类，提供签名的产生、导出、验证等方法。验证签名需要相应的公钥证书。
     def do_sign(self,message,raw=True):
         # 通用的签名方法
         if not self.is_ours:
@@ -216,6 +234,8 @@ class certificate(object):
             return ret
         else:
             return json.dumps(ret)
+
+        log.info("Successfully made a sign.")
 
     def verify_sign(self,message,sign):
         try:
@@ -237,6 +257,9 @@ class certificate(object):
                     return False
                 keyindex += 1
         except Exception,e:
+
+            log.warning("Failed verifying a sign, returning False. More details: %s",e)
+
             print "Error: %s" % e
             return False
         return True
@@ -258,6 +281,8 @@ class certificate(object):
             'Sign_Hash_Algorithm' : sign_hashalgo,
         }
 
+        log.info('Signing Certificate: Subject[%s] TrustLevel[%s] ValidTo[%s]',rawinfo['Certified_ID'],rawinfo['Trust_Level'],raw_info['Valid_To'])
+
         sig = self.do_sign(hashable_json(rawinfo),raw=True)
 
         ret = {"Content":rawinfo,"Signature":sig}
@@ -270,6 +295,7 @@ class certificate(object):
         else:
             return json.dumps(ret)
     def revoke_signature(self,pubcert): # 提供产生对一个公域证书的撤回信息
+        log.warning("Not implemented method -- Certificate Signature Reovcation -- called.")
         pass
     def check_signature_content(self,content,loading=True):
         try:
@@ -296,6 +322,9 @@ class certificate(object):
                         raise Exception("Given signature cannot be validated with this certificate.")
 
             elif c['Title'] == 'Revoke_Signature':      # 处理签名撤回
+                
+                log.warning('Received signature revocation info BUT cannot handle. Considering update firmware of Xi.')
+
                 pass
             else:
                 return False
@@ -305,7 +334,7 @@ class certificate(object):
                     raise Exception("Signature format is bad.")
 
         except Exception,e:
-            print e
+            log.warning('Signature content check cannot pass. Details: %s',e)
             return False
         return True
 
@@ -326,6 +355,9 @@ class certificate(object):
             print 'Loaded a signature'
             self.signatures.append(j)
         except Exception,e:
+
+            log.warning('Cannot load the signature. Details: %s',e)
+
             raise Exception("Error loading a signature: %s" % e)
     def verify_signature(self,sign): # 用本公钥证书验证一个签名
         try:
@@ -341,7 +373,9 @@ class certificate(object):
 
             return self.verify_sign(hashable_json(c),sig)
         except Exception,e:
-            print e
+            
+            log.warning('Signature being invalid. Returning False. Details: %s',e)
+
             return False
         return True
     def get_baseinfo(self):
@@ -464,10 +498,13 @@ class certificate(object):
 
             self.is_ours = False
 
-            print "Certificate verified and loaded."
+            log.info('Certificate successfully loaded. Subject[%s].',certid)
             return True
                         
         except Exception,e:
+            
+            log.exception('Cannot load certificate: %s',e)
+
             raise Exception("Certificate format is bad: %s" % e)
 
     def _encryptor(self,key,message):
@@ -531,6 +568,9 @@ class certificate(object):
         return ret
     def private_decrypt(self,data):
         if not self.is_ours:
+
+            log.exception('Unexcepted public certificate supplied for decrypting.')
+
             raise Exception("This is a public certificate and cannot be used for decrypting.")
         try:
             if type(data) == str:
@@ -564,6 +604,9 @@ class certificate(object):
             #print tempkey.encode('hex')
             return self._decryptor(tempkey,ciphertext)
         except Exception,e:
+
+            log.exception('Cannot decrypt using private certificate: %s',e)
+
             raise Exception("Decrypting Failure: %s" % e)
 if __name__ == "__main__":
     failure = 0
