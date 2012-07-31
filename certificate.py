@@ -124,7 +124,9 @@ class certificate(object):
         
         log.info("Successfully saved private info.")
     def load_private_text(self,filename,pinreader=passphrase_callback):
+
         log.info("Trying to load a private certificate.")
+
         try:
             loadsh = shelve.open(filename)
 
