@@ -44,6 +44,13 @@ class certificate(object):
     
     def __init__(self):
         pass
+    def _validate_subject(self,subj):
+        if len(subj) > 128 or len(subj) < 3:
+            return False
+        for c in subj:
+            if c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_ .":
+                return False
+        return True 
     def generate(self,subject,level=0,**argv):
         # Will generate a new certificate. Compatiable with NERV-XI-001 Standard.
 
@@ -51,7 +58,7 @@ class certificate(object):
 
         # - subject
         subject = subject.strip()
-        if len(subject) > 512 or len(subject) < 3:
+        if not self._validate_subject(subject):
 
             log.exception("Required certificate subject's invalid.")
 
