@@ -50,7 +50,7 @@ class certificate(object):
         if len(subj) > 128 or len(subj) < 3:
             return False
         for c in subj:
-            if c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_ .":
+            if c not in "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_ .":
                 return False
         return True 
     def generate(self,subject,level=0,**argv):
