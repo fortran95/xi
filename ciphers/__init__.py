@@ -29,7 +29,7 @@ class xipher(object):
         if len(key) < keylen:
             raise Exception("Key too short. At least %d bytes required." % keylen)
 
-        log.info('Xipher initilized with key length [%s]bytes.',len(key))
+        log.info('Xipher initialized with key length [%s]bytes.',len(key))
         
         shifting_list = self.cipherlist[:]
         self.encrypt_chain = []
