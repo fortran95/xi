@@ -45,6 +45,8 @@ class certificate(object):
     def __init__(self):
         pass
     def _validate_subject(self,subj):
+        if type(subj) != str:
+            return False
         if len(subj) > 128 or len(subj) < 3:
             return False
         for c in subj:
