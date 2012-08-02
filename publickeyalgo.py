@@ -385,13 +385,20 @@ class _EC(object):
     _pubkey_curve = None
     def __init__(self):
         pass
-    def sign_limit(self):
-        if self._key != None:
-            curveid = self._key_curve
-        elif self._pubkey != None:
-            curveid = self._pubkey_curve
+    def sign_limit(self,curveid=False):
+        if curveid == False:
+            if self._key != None:
+                curveid = self._key_curve
+            elif self._pubkey != None:
+                curveid = self._pubkey_curve
+            else:
+                raise Exception("Not initilized.")
         else:
-            raise Exception("Not initilized.")
+            if type(curveid) == str:
+                try:
+                    curveid = self._curves_id[curveid]
+                except:
+                    raise Exception("Querying unknown curve's sign limit.")
 
         for limit in self._curves_signlimit:
             if curveid in self._curves_signlimit[limit]:

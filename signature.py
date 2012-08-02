@@ -56,12 +56,7 @@ if __name__ == "__main__":
 
             privatekey.generate(curve=c)
 
-            for i in range(1,513):
-                try:    
-                    signature = privatekey.sign('0' * i)
-                except:
-                    print "%s:%s" % (c,i-1)
-                    break
+            print privatekey.sign_limit()
         except:
             print "%s:--" % c
 
