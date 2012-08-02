@@ -284,7 +284,7 @@ class certificate(object):
             return False
         return True
         
-    def sign_certificate(self,pubcert,trustlevel=0,life=0x9E3400, cert_hashalgo='whirlpool', sign_hashalgo='whirlpool', raw=False): #FIXME sign_hashalgo ???
+    def sign_certificate(self,pubcert,trustlevel=0,life=0x9E3400, cert_hashalgo='whirlpool', raw=False):
         # 用本证书签署 pubcert， 信任等级默认为0，有效期120天，使用 do_sign 进行最终的签名
 
         nowtime = time.time() + time.timezone # XXX 注意检查确认为 UTC 时间
@@ -298,7 +298,6 @@ class certificate(object):
             'Trust_Level'         : int(trustlevel),
             'Cert_Hash_Algorithm' : cert_hashalgo,
             'Cert_Digest'         : pubcert.get_hash(cert_hashalgo),
-            'Sign_Hash_Algorithm' : sign_hashalgo,
         }
 
         log.info('Signing Certificate: Subject[%s] TrustLevel[%s] ValidTo[%s]',rawinfo['Certified_ID'],rawinfo['Trust_Level'],rawinfo['Valid_To'])
@@ -324,7 +323,7 @@ class certificate(object):
             else:
                 c = content
             if   c['Title'] == 'New_Signature':         # 处理新签名的保存等
-                testkeys = ('Issuer_ID','Sign_Hash_Algorithm','Certified_ID','Cert_Digest','Trust_Level')
+                testkeys = ('Issuer_ID','Certified_ID','Cert_Digest','Trust_Level')
 
                 if int(c['Issue_UTC']) + int(c['Valid_To']) < time.time() + time.timezone:
                     raise Exception("Given signature already expired.")
@@ -632,12 +631,15 @@ class certificate(object):
 if __name__ == "__main__":
     failure = 0
     c = certificate()
-    c.generate('NEO Example',level=50)
+    d = certificate()
+    c.generate('NEO Example',level=50,bits=1024)
+    d.generate('HMX Example',level=50,bits=1024)
     
-    sig = c.do_sign('a' * 1024)
-    print sig
+    sig = c.sign_certificate(d,trustlevel=1)
 
-    print c.verify_sign('a' * 1024,sig)
+#    d.load_signature(sig)
+
+    print d.get_public_text()
 
     exit()
 
