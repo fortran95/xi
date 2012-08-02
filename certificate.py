@@ -237,7 +237,15 @@ class certificate(object):
         keyindex = 1
         for key in self.keys:
             signer = signature.signature(key.get_privatekey())
-            sig = signer.new(message,'SHA1',raw)   # XXX 安全泄漏。应当考虑一种提供选择的方法
+            signlimit = key.sign_limit()
+
+            hashalgo = Hash().consult(signlimit)
+            if len(hashalgo) < 1:
+                raise Exception("No suitable hash functions found.")
+            maxhash = hashalgo[max(hashalgo.keys())]
+            choosenalgo = maxhash[random.randint(0,len(maxhash) - 1)]
+
+            sig = signer.new(message,choosenalgo,raw)   # XXX 安全泄漏。应当考虑一种提供选择的方法
             ret[keyindex] = sig
             keyindex += 1
         if raw:
@@ -622,7 +630,14 @@ class certificate(object):
 if __name__ == "__main__":
     failure = 0
     c = certificate()
-    c.generate('NEO Example',level=50,bits=4096,curve=734)
+    c.generate('NEO Example',level=50)
+    
+    sig = c.do_sign('a' * 1024)
+    print sig
+
+    print c.verify_sign('a' * 1024,sig)
+
+    exit()
 
     c.save_private_text('neo.private')
 

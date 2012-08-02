@@ -42,6 +42,9 @@ class PublicKeyAlgorithm(object):
                 self.key.load_publickey(keystr)
         except Exception,e:
             raise Exception("Failed initilizing PublicKeyAlgorithm: %s" % e)
+    
+    def sign_limit(self):
+        return self.key.sign_limit()
 
     def get_publickey(self,raw=False):
         return self.key.get_publickey(raw)
@@ -446,8 +449,7 @@ class _EC(object):
         tempkey.gen_key()
         sharedsecret = tempkey.compute_dh_key(self._pubkey)
         
-        # XXX TODO REMOVE THIS
-        print "Length of key is: %d" % (len(sharedsecret) * 8)
+        log.debug("Length of key is: %d",(len(sharedsecret) * 8))
 
         # Encrypt
         ciphertext = encryptor(sharedsecret,message)
