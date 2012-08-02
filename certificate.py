@@ -148,6 +148,8 @@ class certificate(object):
                     log.info("Load as encrypted text. Requiring passphrase.")
 
                     passphrase = pinreader(False)
+                    if type(passphrase) != str:
+                        raise Exception("User refused passphrase request.")
                     key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
 #                    print key.encode('base64')
                     decryptor = ciphers.xipher(key)
@@ -282,7 +284,7 @@ class certificate(object):
             return False
         return True
         
-    def sign_certificate(self,pubcert,trustlevel=0,life=0x9E3400, cert_hashalgo='SHA256', sign_hashalgo='SHA256', raw=False): 
+    def sign_certificate(self,pubcert,trustlevel=0,life=0x9E3400, cert_hashalgo='whirlpool', sign_hashalgo='whirlpool', raw=False): #FIXME sign_hashalgo ???
         # 用本证书签署 pubcert， 信任等级默认为0，有效期120天，使用 do_sign 进行最终的签名
 
         nowtime = time.time() + time.timezone # XXX 注意检查确认为 UTC 时间
@@ -299,7 +301,7 @@ class certificate(object):
             'Sign_Hash_Algorithm' : sign_hashalgo,
         }
 
-        log.info('Signing Certificate: Subject[%s] TrustLevel[%s] ValidTo[%s]',rawinfo['Certified_ID'],rawinfo['Trust_Level'],raw_info['Valid_To'])
+        log.info('Signing Certificate: Subject[%s] TrustLevel[%s] ValidTo[%s]',rawinfo['Certified_ID'],rawinfo['Trust_Level'],rawinfo['Valid_To'])
 
         sig = self.do_sign(hashable_json(rawinfo),raw=True)
 
