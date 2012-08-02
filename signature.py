@@ -47,14 +47,21 @@ class signature(object):
 if __name__ == "__main__":
 
     import publickeyalgo
+    
+    pk = publickeyalgo._EC()
 
-    privatekey = publickeyalgo._EC()
-    privatekey.generate(curve=734)
+    for c in pk._curves_name:
+        try:
+            privatekey = publickeyalgo._EC()
 
-    privatekey_str = privatekey.get_privatekey()
+            privatekey.generate(curve=c)
 
-    signer = signature(privatekey_str)
-    signature = signer.new('dkfjaskfsjk')
-
-    print signer.verify(signature,'dkfjaskfsjk')
+            for i in range(1,513):
+                try:    
+                    signature = privatekey.sign('0' * i)
+                except:
+                    print "%s:%s" % (c,i-1)
+                    break
+        except:
+            print "%s:--" % c
 

@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
-import random,time,os,json,uuid,hashlib,math
+import random,time,os,json,uuid,hashlib,math,logging
 from M2Crypto import EC,RSA
+
+log = logging.getLogger('xi.publickeyalgo')
+
 def tempfilename():
     return hashlib.md5(str(uuid.uuid3(uuid.uuid1(),str(uuid.uuid4())))).hexdigest()
 
@@ -73,9 +76,13 @@ class _RSA(object):
         if bits < 1024:
             raise Exception("Cannot accept such bits < 1024.")
         self.bits = bits
-        print "Generating a %d bits RSA key, please wait." % bits
+
+        log.debug("Generating a %d bits RSA key, please wait." % bits)
+
         self._key = RSA.gen_key(bits,65537)
-        print "RSA key generation done."
+        
+        log.debug("RSA key generation done.")
+
         self._derive_pubkey()
     def sign(self,digest):
         if self._key == None:
@@ -350,6 +357,28 @@ class _EC(object):
         'NID_wap_wsg_idm_ecid_wtls11':744,
         'NID_wap_wsg_idm_ecid_wtls12':745,
     }
+    _curves_signlimit = {
+        13:(705,),
+        14:(704,717,718,735,737,739,741),
+        15:(707,),
+        16:(706,719,720),
+        20:(684,685,686,687,708,709,710,721,722,723,736,738,740,742),
+        23:(688,689,690),
+        24:(409,410,411,693,711,724,725),
+        28:(712,713,745),
+        29:(412,413,414,694,695,696,726,727,728,743,744),
+        32:(415,699,714),
+        35:(729,730),
+        36:(700,),
+        44:(701,702),
+        48:(715,),
+        50:(731,),
+        51:(732,),
+        52:(703,),
+        65:(716,),
+        71:(733,734),
+    }
+
     _key = None
     _pubkey = None
     _key_curve = None
@@ -358,21 +387,17 @@ class _EC(object):
         pass
     def sign_limit(self):
         if self._key != None:
-            curvename = self._key_curve
+            curveid = self._key_curve
         elif self._pubkey != None:
-            curvename = self._pubkey_curve
+            curveid = self._pubkey_curve
         else:
             raise Exception("Not initilized.")
 
-        curvename = self._curves_name[curvename]
-        # XXX XXX XXX XXX XXX XXX 这里没有完善！XXX XXX XXX XXX XXX XXX XXX
-        if curvename[0:10] == 'NID_X9_62_':
-            return int(math.floor(int(curvename[15:18]) / 8.0))
-        elif curvename[0:7] == 'NID_sec':
-            return int(math.floor(int(curvename[8:11] ) / 8.0))
-        else:
-            return 10
-
+        for limit in self._curves_signlimit:
+            if curveid in self._curves_signlimit[limit]:
+                return limit
+        return min(self._curves_signlimit.keys())
+        
     def generate(self,**argv):
         # select EC curve.
         if argv.has_key('curve'):
@@ -389,7 +414,7 @@ class _EC(object):
         self._derive_pubkey()
         self._key_curve, self._pubkey_curve = curve,curve
         
-        print "Generated new EC key basing on %s." % curve_name
+        log.debug("Generated new EC key basing on %s." % curve_name)
     def sign(self,digest):
         # sign the given DIGEST. Output was base64-encoded.
         if self._key == None:
