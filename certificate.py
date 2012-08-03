@@ -40,6 +40,7 @@ class certificate(object):
     subject = None
     keys = None
     is_ours = False
+    private_save_key = None
     signatures = []
     
     def __init__(self):
@@ -85,6 +86,7 @@ class certificate(object):
         # clear others
         self.signatures = []
         self.level = level
+        self.private_save_key = None
         
         # After generated, load this cert. into the instance.
 
@@ -123,8 +125,12 @@ class certificate(object):
         savesh.close()
         
         if pinreader != None:
-            passphrase = pinreader(True)
-            key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
+            if self.private_save_key == None:
+                passphrase = pinreader(True)
+                key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
+                self.private_save_key = key
+            else:
+                key = self.private_save_key
             #print key.encode('base64')
             encryptor = ciphers.xipher(key)
             shcontent = encryptor.encrypt(open(filename,'r').read()).encode('base64')
@@ -151,7 +157,8 @@ class certificate(object):
                     if type(passphrase) != str:
                         raise Exception("User refused passphrase request.")
                     key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
-#                    print key.encode('base64')
+                    self.private_save_key = key
+
                     decryptor = ciphers.xipher(key)
                     shcontent = decryptor.decrypt(open(filename,'r').read().decode('base64'))
                     open(filename + '.temp','w').write(shcontent)
@@ -516,6 +523,7 @@ class certificate(object):
             # Now load this certificate.
 
             self.is_ours = False
+            self.private_save_key = None
 
             log.info('Public certificate successfully loaded. Subject[%s].',basic_subject)
 
