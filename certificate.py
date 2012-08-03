@@ -378,7 +378,7 @@ class certificate(object):
 
             if not self.check_signature_content(c,loading=True):
                 raise Exception("This signature cannot be loaded. Either it is of invalid format, or it is not for this certificate.")
-            print 'Loaded a signature'
+            log.info('Signature loaded.')
             self.signatures.append(j)
         except Exception,e:
 
