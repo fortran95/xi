@@ -54,6 +54,9 @@ class certificate(object):
             if c not in "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_ .":
                 return False
         return True 
+    def derive_savekey(self,passphrase):
+        return Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
+
     def generate(self,subject,level=0,**argv):
         # Will generate a new certificate. Compatiable with NERV-XI-001 Standard.
 
@@ -127,7 +130,7 @@ class certificate(object):
         if pinreader != None:
             if self.private_save_key == None:
                 passphrase = pinreader(True)
-                key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
+                key = self.derive_savekey(passphrase)
                 self.private_save_key = key
             else:
                 key = self.private_save_key
@@ -156,7 +159,7 @@ class certificate(object):
                     passphrase = pinreader(False)
                     if type(passphrase) != str:
                         raise Exception("User refused passphrase request.")
-                    key = Hash('sha512',passphrase).digest() + Hash('whirlpool',passphrase).digest()
+                    key = self.derive_savekey(passphrase)
                     self.private_save_key = key
 
                     decryptor = ciphers.xipher(key)
