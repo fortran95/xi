@@ -364,21 +364,42 @@ class certificate(object):
             return False
         return True
 
+    def signature_hash(self,sign):
+        try:
+            if type(sign) == type(""):
+                j = json.loads(sign)
+            else:
+                j = sign
+            jc = j['Content']
+            p1 = jc['Certified_ID'].strip().lower()
+            p2 = jc['Issuer_ID'].strip().lower()
+            p3 = int(jc['Issue_UTC'])
+            p4 = int(jc['Valid_To'])
+            p5 = int(jc['Trust_Level'])
+            return "%s;%s;%d;%d;%d" % (p1,p2,p3,p4,p5)
+        except Exception,e:
+            return False
     def load_signature(self,sign): 
         # 对于私或公用证书均可，加载一个签名信息，可能是签名或签名撤回信息
-        # XXX 只能进行初步的形式上的认证：是否是给此证书的，是否过期等。签名的有效性和可信等级需要安全顾问确认，非本class的职责。
         try:
             if type(sign) == type(""):
                 j = json.loads(sign)
             else:
                 j = sign
 
-            sig = j['Signature']
-            c   = j['Content']
+            sig   = j['Signature']
+            c     = j['Content']
+            chash = self.signature_hash(j)
 
             if not self.check_signature_content(c,loading=True):
                 raise Exception("This signature cannot be loaded. Either it is of invalid format, or it is not for this certificate.")
             log.info('Signature loaded.')
+
+            for s in self.signatures:
+                if self.signature_hash(s) == chash:
+                    log.warning('This signature has already been loaded.')
+                    return
+
             self.signatures.append(j)
         except Exception,e:
 
