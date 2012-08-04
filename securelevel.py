@@ -95,8 +95,6 @@ class securelevel(object):
                     ret.append((issuer.get_id(),self.indexes[issuer_id][1],sig['Content']['Trust_Level']))
             else:
                 self.foreigners.append(issuer_id)
-        #print "Walk result of '%s':" % cert.subject
-        #print ret
         return ret
     def initilize(self,paths):
 
