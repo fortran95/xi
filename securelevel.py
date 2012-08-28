@@ -83,11 +83,30 @@ class securelevel(object):
     def walk(self,cert):
         cert_level = cert.level
         ret = []
-        for sig in cert.signatures:
+        srl = {} # Signature Revocation List
+
+        for sig in cert.signatures: # Read In SRL
+            if sig['Content']['Title'] != 'Revoke_Signature':
+                continue
             issuer_id = sig['Content']['Issuer_ID']
             if self.indexes.has_key(issuer_id):
                 issuer = self.indexes[issuer_id][0]
                 if issuer.level <= cert_level:
+                    continue
+                if issuer.verify_signature(sig):
+                    srl[sig['Content']['Issuer_ID']] = int(sig['Content']['Issue_UTC'])
+            else:
+                self.foreigners.append(issuer_id)
+
+        for sig in cert.signatures:
+            if sig['Content']['Title'] != 'New_Signature':
+                continue
+            issuer_id = sig['Content']['Issuer_ID']
+            if self.indexes.has_key(issuer_id):
+                issuer = self.indexes[issuer_id][0]
+                if issuer.level <= cert_level:
+                    continue
+                if srl.has_key(issuer_id) and srl[issuer_id] >= sig['Content']['Issue_UTC']:
                     continue
                 if issuer.verify_signature(sig):
                     # 得到了本证书的一个上级证书，并且通过了验证

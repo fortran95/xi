@@ -42,7 +42,7 @@ class certificate(object):
     is_ours = False
     private_save_key = None
     signatures = []
-    sign_revoke_list = [] # Records which issuers have revoked their signatures.
+    #sign_revoke_list = [] # Records which issuers have revoked their signatures.
     
     def __init__(self):
         pass
@@ -88,7 +88,7 @@ class certificate(object):
         self.keys = [key_ec,key_rsa]
         self.is_ours = True
         # clear others
-        self.signatures,self.sign_revoke_list = [],[]
+        self.signatures = []
         self.level = level
         self.private_save_key = None
         
@@ -219,7 +219,7 @@ class certificate(object):
             self.level   = basic_level
             
             # Load signatures
-            self.signatures,self.sign_revoke_list = [],[]
+            self.signatures = []
             if loadsh.has_key('Signatures'):
                 for sig in loadsh['Signatures']:
                     self.load_signature(sig)
@@ -404,6 +404,9 @@ class certificate(object):
             return "%s;%s;%d;%d;%d" % (p1,p2,p3,p4,p5)
         except Exception,e:
             return False
+    def clear_signatures(self):
+        # Clear signatures that have been revocated.
+
     def load_signature(self,sign): 
         # 对于私或公用证书均可，加载一个签名信息，可能是签名或签名撤回信息
         try:
@@ -561,7 +564,7 @@ class certificate(object):
             self.level   = basic_level
 
             # Load signatures
-            self.signatures,self.sign_revoke_list = [],[]
+            self.signatures = []
             if j.has_key('Signatures'):
                 for sig in j['Signatures']:
                     self.load_signature(sig)
