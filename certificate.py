@@ -42,6 +42,7 @@ class certificate(object):
     is_ours = False
     private_save_key = None
     signatures = []
+    sign_revoke_list = [] # Records which issuers have revoked their signatures.
     
     def __init__(self):
         pass
@@ -87,7 +88,7 @@ class certificate(object):
         self.keys = [key_ec,key_rsa]
         self.is_ours = True
         # clear others
-        self.signatures = []
+        self.signatures,self.sign_revoke_list = [],[]
         self.level = level
         self.private_save_key = None
         
@@ -218,7 +219,7 @@ class certificate(object):
             self.level   = basic_level
             
             # Load signatures
-            self.signatures = []
+            self.signatures,self.sign_revoke_list = [],[]
             if loadsh.has_key('Signatures'):
                 for sig in loadsh['Signatures']:
                     self.load_signature(sig)
@@ -323,10 +324,26 @@ class certificate(object):
             return ret
         else:
             return json.dumps(ret)
-    def revoke_signature(self,pubcert): # 提供产生对一个公域证书的撤回信息
-        log.warning("Not implemented method -- Certificate Signature Reovcation -- called.")
-        pass
+    def revoke_signature(self,pubcert, raw=False): # 提供产生对一个公域证书的撤回信息
+        nowtime = time.time() + time.timezone
+        rawinfo = {
+            'Title'                 : 'Revoke_Signature',
+            'Target_ID'             : pubcert.get_id(),
+            'Issuer_ID'             : self.get_id(),
+            'Issue_UTC'             : int(nowtime),
+        }
+        sig = self.do_sign(hashable_json(rawinfo),raw=True)
+        ret = {"Content":rawinfo,"Signature":sig}
+        
+        pubcert.signatures.append(ret)
+
+        if raw:
+            return ret
+        else:
+            return json.dumps(ret)
+        
     def check_signature_content(self,content,loading=True):
+        nowtime = time.time() + time.timezone
         try:
             if type(content) == type(""):
                 c = json.loads(content)
@@ -335,7 +352,7 @@ class certificate(object):
             if   c['Title'] == 'New_Signature':         # 处理新签名的保存等
                 testkeys = ('Issuer_ID','Certified_ID','Cert_Digest','Trust_Level')
 
-                if int(c['Issue_UTC']) + int(c['Valid_To']) < time.time() + time.timezone:
+                if int(c['Issue_UTC']) + int(c['Valid_To']) < nowtime:
                     raise Exception("Given signature already expired.")
 
                 if not int(c['Trust_Level']) in range(-3,4):
@@ -351,10 +368,15 @@ class certificate(object):
                         raise Exception("Given signature cannot be validated with this certificate.")
 
             elif c['Title'] == 'Revoke_Signature':      # 处理签名撤回
-                
-                log.warning('Received signature revocation info BUT cannot handle. Considering update firmware of Xi.')
-
-                pass
+                testkeys = ('Issuer_ID','Target_ID')
+                if int(c['Issue_UTC']) > nowtime or int(c['Issue_UTC']) < 0:
+                    raise Exception("Given revocation time invalid.")
+                if loading:
+                    if c['Target_ID'] != self.get_id():
+                        raise Exception("Given signature is not for this certificate.")
+                else:
+                    if c['Issuer_ID'] != self.get_id():
+                        raise Exception("Given signature cannot be validated with this certificate.")
             else:
                 return False
             
@@ -539,7 +561,7 @@ class certificate(object):
             self.level   = basic_level
 
             # Load signatures
-            self.signatures = []
+            self.signatures,self.sign_revoke_list = [],[]
             if j.has_key('Signatures'):
                 for sig in j['Signatures']:
                     self.load_signature(sig)
