@@ -212,6 +212,7 @@ class certificate(object):
             if not basic_prvkey_sensible:
                 raise Exception("This ceritificate's private key info is non-sense.")
             if not ( eckey._key != None and rsakey._key != None ):
+#                print (eckey._key != None, rsakey._key != None)
                 raise Exception("This certificate has insufficient private key info.")
 
             self.keys = [eckey, rsakey]
@@ -404,8 +405,6 @@ class certificate(object):
             return "%s;%s;%d;%d;%d" % (p1,p2,p3,p4,p5)
         except Exception,e:
             return False
-    def clear_signatures(self):
-        # Clear signatures that have been revocated.
 
     def load_signature(self,sign): 
         # 对于私或公用证书均可，加载一个签名信息，可能是签名或签名撤回信息

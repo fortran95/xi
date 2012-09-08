@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import random,time,os,json,uuid,hashlib,math,logging
-from M2Crypto import EC,RSA
+from M2Crypto import EC,RSA,BIO
 
 log = logging.getLogger('xi.publickeyalgo')
 
@@ -151,12 +151,15 @@ class _RSA(object):
             raise Exception("Failed loading publickey. Bad format. Error: %s" % e)
         # If parsable, Write down and load.
         try:
-            filename = tempfilename()
-            open(filename,'w+').write(pkdata)
-            self._pubkey = RSA.load_pub_key(filename)
-            os.remove(filename)
+            membuff = BIO.MemoryBuffer()
+            membuff.write(pkdata)
+            self._pubkey = RSA.load_pub_key_bio(membuff)
+#            filename = tempfilename()
+#            open(filename,'w+').write(pkdata)
+#            self._pubkey = RSA.load_pub_key(filename)
+#            os.remove(filename)
         except Exception,e:
-            raise Exception("Cannot load public key.")
+            raise Exception("Cannot load public key: %s" % e)
         # Delete existing private key to avoid conflicts.
         self._key = None
         # succeeded.
@@ -173,10 +176,13 @@ class _RSA(object):
             raise Exception("Failed loading privatekey. Bad format.")
         # If parsable, Write down and load.
         try:
-            filename = tempfilename()
-            open(filename,'w+').write(pkdata)
-            self._key = RSA.load_key(filename)
-            os.remove(filename)
+#            filename = tempfilename()
+            membuff = BIO.MemoryBuffer()
+            membuff.write(pkdata)
+            self._key = RSA.load_key_bio(membuff)
+#            open(filename,'w+').write(pkdata)
+#            self._key = RSA.load_key(filename)
+#            os.remove(filename)
         except Exception,e:
             raise Exception("Cannot load private key. Error: %s" % e)
         # Override existing public key.
@@ -187,10 +193,13 @@ class _RSA(object):
         if self._pubkey == None:
             return False
         # Retrive pubkey data
-        filename = tempfilename()
-        self._pubkey.save_pub_key(filename)
-        pubkeydata = open(filename).read()
-        os.remove(filename)
+
+        membuff = BIO.MemoryBuffer()
+        #self._pubkey = RSA.load_pub_key_bio(membuff)
+        #filename = tempfilename()
+        self._pubkey.save_pub_key_bio(membuff)
+        pubkeydata = membuff.read_all()  #open(filename).read()
+#        os.remove(filename)
         # Write down a good form of public key.
         pkinfo = {
                 'type'  :'RSA_Public_Key',
@@ -204,10 +213,11 @@ class _RSA(object):
         if self._key == None:
             return False
         # Retrive privatekey data
-        filename = tempfilename()
-        self._key.save_key(filename,None)
-        prvkeydata = open(filename).read()
-        os.remove(filename)
+        membuff = BIO.MemoryBuffer()
+#        filename = tempfilename()
+        self._key.save_key_bio(membuff,None)
+        prvkeydata = membuff.read_all()  #open(filename).read()
+#        os.remove(filename)
         # Write down a good form of public key.
         pkinfo = {
                 'type'  :'RSA_Private_Key',
@@ -221,10 +231,11 @@ class _RSA(object):
         # derive EC public key instance from self._key
         if self._key == None:
             return False
-        filename = tempfilename()
-        self._key.save_pub_key(filename)
-        self._pubkey = RSA.load_pub_key(filename)
-        os.remove(filename)
+#        filename = tempfilename()
+        membuff = BIO.MemoryBuffer()
+        self._key.save_pub_key_bio(membuff)  #(filename)
+        self._pubkey = RSA.load_pub_key_bio(membuff)   #(filename)
+#        os.remove(filename)
 class _EC(object):
     _curves_name = {
         707:'NID_secp128r2',
@@ -454,10 +465,11 @@ class _EC(object):
         # Encrypt
         ciphertext = encryptor(sharedsecret,message)
         # Get tempkey's public key.
-        filename = tempfilename()
-        tempkey.save_pub_key(filename)
-        publickey = open(filename).read()
-        os.remove(filename)
+        membuff = BIO.MemoryBuffer()
+#        filename = tempfilename()
+        tempkey.save_pub_key_bio(membuff)
+        publickey = membuff.read_all()  #open(filename).read()
+#        os.remove(filename)
         # Return with json.
         ret = json.dumps(
             {
@@ -483,10 +495,13 @@ class _EC(object):
             raise Exception("Bad EC ciphertext format.")
         try:
             # Read the temp. key. First write to a file.
-            filename = tempfilename()
-            open(filename,'w+').write(publickey)
-            tempkey = EC.load_pub_key(filename)
-            os.remove(filename)
+#            filename = tempfilename()
+            membuff = BIO.MemoryBuffer()
+#            open(filename,'w+').write(publickey)
+            membuff.write(publickey)
+#            tempkey = EC.load_pub_key(filename)
+            tempkey = EC.load_pub_key_bio(membuff)
+#            os.remove(filename)
             # Combine this temp. key with our private key, and get Shared Secret.
             sharedsecret = self._key.compute_dh_key(tempkey)
         except Exception,e:
@@ -507,13 +522,15 @@ class _EC(object):
             raise Exception("Failed loading publickey. Bad format. Error: %s" % e)
         # If parsable, Write down and load.
         try:
-            filename = tempfilename()
-            open(filename,'w+').write(pkdata)
-            self._pubkey = EC.load_pub_key(filename)
+#            filename = tempfilename()
+            membuff = BIO.MemoryBuffer()
+#            open(filename,'w+').write(pkdata)
+            membuff.write(pkdata)
+            self._pubkey = EC.load_pub_key_bio(membuff)   #(filename)
             self._pubkey_curve = curve
-            os.remove(filename)
+#            os.remove(filename)
         except Exception,e:
-            raise Exception("Cannot load public key.")
+            raise Exception("Cannot load public key: %s" % e)
         # Delete existing private key to avoid conflicts.
         self._key = None
         self._key_curve = None
@@ -522,7 +539,10 @@ class _EC(object):
     def load_privatekey(self,privatekey):
         # Try parse the private key info.
         try:
-            j = json.loads(privatekey)
+            if type(privatekey) == str:
+                j = json.loads(privatekey)
+            else:
+                j = privatekey
             if j['type'] != 'EC_Private_Key':
                 raise Exception("This is not a private key thus cannot be loaded.")
             if self._curves_id.has_key(j['curve']):
@@ -534,11 +554,13 @@ class _EC(object):
             raise Exception("Failed loading privatekey. Bad format.")
         # If parsable, Write down and load.
         try:
-            filename = tempfilename()
-            open(filename,'w+').write(pkdata)
-            self._key = EC.load_key(filename)
+#            filename = tempfilename()
+            membuff = BIO.MemoryBuffer()
+#            open(filename,'w+').write(pkdata)
+            membuff.write(pkdata)
+            self._key = EC.load_key_bio(membuff)  #(filename)
             self._key_curve = curve
-            os.remove(filename)
+#            os.remove(filename)
         except Exception,e:
             raise Exception("Cannot load private key. Error: %s" % e)
         # Override existing public key.
@@ -550,10 +572,11 @@ class _EC(object):
         if self._pubkey == None or self._pubkey_curve == None:
             return False
         # Retrive pubkey data
-        filename = tempfilename()
-        self._pubkey.save_pub_key(filename)
-        pubkeydata = open(filename).read()
-        os.remove(filename)
+#        filename = tempfilename()
+        membuff = BIO.MemoryBuffer()
+        self._pubkey.save_pub_key_bio(membuff)  #(filename)
+        pubkeydata = membuff.read_all()  #open(filename).read()
+#        os.remove(filename)
         # Write down a good form of public key.
         pkinfo = {
                 'type'  :'EC_Public_Key',
@@ -567,10 +590,11 @@ class _EC(object):
         if self._key == None or self._key_curve == None:
             return False
         # Retrive privatekey data
-        filename = tempfilename()
-        self._key.save_key(filename,None)
-        prvkeydata = open(filename).read()
-        os.remove(filename)
+#        filename = tempfilename()
+        membuff = BIO.MemoryBuffer()
+        self._key.save_key_bio(membuff,None)  #(filename,None)
+        prvkeydata = membuff.read_all()  #open(filename).read()
+#        os.remove(filename)
         # Write down a good form of public key.
         pkinfo = {
                 'type'  :'EC_Private_Key',
@@ -584,10 +608,11 @@ class _EC(object):
         # derive EC public key instance from self._key
         if self._key == None:
             return False
-        filename = tempfilename()
-        self._key.save_pub_key(filename)
-        self._pubkey = EC.load_pub_key(filename)
-        os.remove(filename)
+#        filename = tempfilename()
+        membuff = BIO.MemoryBuffer()
+        self._key.save_pub_key_bio(membuff)   #(filename)
+        self._pubkey = EC.load_pub_key_bio(membuff)  #filename)
+#        os.remove(filename)
 
 if __name__ == "__main__":
     r = _EC()
