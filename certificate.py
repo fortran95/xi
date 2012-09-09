@@ -98,15 +98,12 @@ class certificate(object):
 
     def save_private_text(self,filename,pinreader=passphrase_callback):
         if not self.is_ours:
-
             log.exception("Attempt to save a public certificate's private info failed.")
-
             raise Exception("Trying to save private info of a public certificate.")
 
         if os.path.isfile(filename):
             os.remove(filename)
-        savesh = shelve.open(filename,writeback=True)
-        savesh.clear()
+        savesh = {}
 
         # save info
         savesh['Title']   = 'Xi_Certificate_Private'
@@ -125,8 +122,8 @@ class certificate(object):
                 savesh['Signatures'].append(sig)
 
         # final
-        savesh.sync()
-        savesh.close()
+#        open(filename,'w+').write(savesh)
+        shcontent = json.dumps(savesh)
         
         if pinreader != None:
             if self.private_save_key == None:
@@ -137,9 +134,9 @@ class certificate(object):
                 key = self.private_save_key
             #print key.encode('base64')
             encryptor = ciphers.xipher(key)
-            shcontent = encryptor.encrypt(open(filename,'r').read()).encode('base64')
-            os.remove(filename)
-            open(filename,'w').write(shcontent)
+            shcontent = encryptor.encrypt(shcontent)
+
+        open(filename,'w').write(shcontent)
         
         log.info("Successfully saved private info.")
     def load_private_text(self,filename,pinreader=passphrase_callback):
@@ -147,8 +144,7 @@ class certificate(object):
         log.info("Trying to load a private certificate.")
 
         try:
-            loadsh = shelve.open(filename)
-
+            loadsh = json.loads(open(filename,'r').read())
             log.info("Load as plain text with no passphrase seems OK.")
 
         except:
@@ -164,15 +160,11 @@ class certificate(object):
                     self.private_save_key = key
 
                     decryptor = ciphers.xipher(key)
-                    shcontent = decryptor.decrypt(open(filename,'r').read().decode('base64'))
-                    open(filename + '.temp','w').write(shcontent)
-                    loadsh = shelve.open(filename + '.temp')
+                    shcontent = decryptor.decrypt(open(filename,'r').read())
+                    
+                    loadsh = json.loads(shcontent)
                 except Exception,e:
-                    if os.path.isfile(filename + '.temp'):
-                        os.remove(filename + '.temp')
-
                     log.exception("Unable to decrypt given file: %s",e)
-
                     raise Exception("Unable to decrypt given file: %s" % e)
             else:
                 raise Exception("Unable to load given file.")
@@ -238,9 +230,6 @@ class certificate(object):
             raise Exception("Certificate format is bad: %s" % e)
             return False
 
-        temp = filename + '.temp'
-        if os.path.isfile(temp):
-            os.remove(temp)
         return True
 
     def do_sign(self,message,raw=True):
