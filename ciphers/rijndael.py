@@ -406,26 +406,34 @@ def decrypt(rinst, buff):
 # Tests.
 #
 
+def get_class(purePython=False):
+    try:
+        if purePython:
+            raise Exception()
+        import Crypto.Cipher.AES
+        class Rijndael_Alternative:
+            def __init__(self, key=None):
+                if key:
+                    self.aes = Crypto.Cipher.AES.new(key)
+            def set_key(self, key):
+                self.aes = Crypto.Cipher.AES.new(key)
+            def decrypt(self, data):
+                return self.aes.decrypt(data)
+            def encrypt(self, data):
+                return self.aes.encrypt(data)
+            def get_name(self):
+                return "Rijndael"
+            def get_key_size(self):
+                return 32
+            def get_block_size(self):
+                return 16
+        return Rijndael_Alternative
+    except:
+        return Rijndael
+
+
 if __name__ == "__main__" and BLOCK_SIZE == 16:
+    cipher = get_class()
     assert Rijndael('012345678abcdefgh00112233xyzqwer').encrypt('a'*16) == '%\x98\x8a \xf8\\\x10\x9c\x17\x16\x9bb\x9e\xd6*\x96'
     assert Rijndael('012345678abcdefgh00112233xyzqwer').decrypt('%\x98\x8a \xf8\\\x10\x9c\x17\x16\x9bb\x9e\xd6*\x96') == 'a'*16
     assert Rijndael('\x10'*32).encrypt('1234'*4) == '\xba\xad\xaawV|S\xc36>1\x03\xfd\x9e+\x9d'
-
-##import Crypto.Cipher.AES
-##
-##class Rijndael:
-##    def __init__(self, key=None):
-##        if key:
-##            self.aes = Crypto.Cipher.AES.new(key)
-##    def set_key(self, key):
-##        self.aes = Crypto.Cipher.AES.new(key)
-##    def decrypt(self, data):
-##        return self.aes.decrypt(data)
-##    def encrypt(self, data):
-##        return self.aes.encrypt(data)
-##    def get_name(self):
-##        return "Rijndael"
-##    def get_key_size(self):
-##        return 32
-##    def get_block_size(self):
-##        return 16

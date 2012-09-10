@@ -9,10 +9,10 @@ log = logging.getLogger('xi.ciphers.xipher')
 class xipher(object):
 
     cipherlist = [
-        [serpent.Serpent,   serpent.key_size,  ],
-        [twofish.Twofish,   twofish.key_size   ],
-        [rijndael.Rijndael, rijndael.key_size  ],
-        [xxtea.XXTEA,       xxtea.key_size,    ],
+        [serpent.Serpent,     serpent.key_size,  ],
+        [twofish.Twofish,     twofish.key_size   ],
+        [rijndael.get_class(), rijndael.key_size  ],
+        [xxtea.XXTEA,         xxtea.key_size,    ],
 #        [blowfish.Blowfish, blowfish.key_size, blowfish.block_size],
     ]
     blocksize  = 16
