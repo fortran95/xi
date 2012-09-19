@@ -20,7 +20,7 @@ class signature(object):
         except Exception,e:
             raise Exception("Unable to sign, error: %s" % e)
         
-        signature = {'Type':'Signature','Digest_Method':digestmod,'Data':signraw.encode('base64')}
+        signature = {'Type':'Signature','Digest_Method':digestmod,'Data':signraw}
 
         if raw:
             return signature
@@ -36,7 +36,7 @@ class signature(object):
             if j['Type'] != 'Signature':
                 raise Exception("This may not be a signature.")
             digestmod = j['Digest_Method']
-            signraw = j['Data'].decode('base64')
+            signraw = j['Data']
 
             msghash = Hash(digestmod,message).digest()
             
