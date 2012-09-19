@@ -1,39 +1,24 @@
 # -*- coding: utf-8 -*-
-"""
-用户标识
-公钥信息
-    公钥环
-        参数：值，参数：值……
-            对于ECDH，需要给定：
-                1)曲线参数。因为只有同种曲线才能进行密钥交换。
-                2)密钥的公钥值
-            对于
-        
---------------------------------------------------------------------------------    
-指纹（根据以上全部信息和规定格式）
-    指纹算法
-    hash值
-证书ID：指纹的某个hash
 
-以上信息的数字签名，格式为：
-    HMAC-KEY
-    签名者的证书ID
-    签名日期
-    有效日期（证书的有效期由上级确定，没有签名的证书本身就是可疑的）
-    签名用的HASH算法
-    签名者的签名；对以下内容进行签名
-        证书的指纹
-        签名日期
-        有效日期
-"""
-import random,time,os,json,uuid,shelve,logging
-import publickeyalgo,signature,ciphers
+import random
+import time
+import os
+import uuid
+import shelve
+import logging
+import json
+
 from M2Crypto.util import passphrase_callback
+import bson as serializer
+
+import publickeyalgo
+import signature
+import ciphers
 from hashes import Hash
 
 log = logging.getLogger('xi.ceritificate')
 
-def hashable_json(input):
+def hashable_obj(input):
     return json.dumps(input,sort_keys=True,indent=0,ensure_ascii=True).strip()
 
 class certificate(object):
@@ -123,7 +108,7 @@ class certificate(object):
 
         # final
 #        open(filename,'w+').write(savesh)
-        shcontent = json.dumps(savesh)
+        shcontent = serializer.dumps(savesh)
         
         if pinreader != None:
             if self.private_save_key == None:
@@ -144,7 +129,7 @@ class certificate(object):
         log.info("Trying to load a private certificate.")
 
         try:
-            loadsh = json.loads(open(filename,'r').read())
+            loadsh = serializer.loads(open(filename,'r').read())
             log.info("Load as plain text with no passphrase seems OK.")
 
         except:
@@ -162,7 +147,7 @@ class certificate(object):
                     decryptor = ciphers.xipher(key)
                     shcontent = decryptor.decrypt(open(filename,'r').read())
                     
-                    loadsh = json.loads(shcontent)
+                    loadsh = serializer.loads(shcontent)
                 except Exception,e:
                     log.exception("Unable to decrypt given file: %s",e)
                     raise Exception("Unable to decrypt given file: %s" % e)
@@ -181,7 +166,7 @@ class certificate(object):
             basic_level   = basic['Level']
             basic_public_key_ring = basic['Public_Key_Ring']
 
-            certid = Hash('md5',hashable_json(basic)).hexdigest()
+            certid = Hash('md5',hashable_obj(basic)).hexdigest()
 
             # Try to load public keys
 
@@ -193,9 +178,9 @@ class certificate(object):
 
                     prvkey = basic_public_key_ring[key]
                     if prvkey['type'] == 'EC_Private_Key':
-                        ret = eckey.load_privatekey(json.dumps(prvkey))
+                        ret = eckey.load_privatekey(serializer.dumps(prvkey))
                     elif prvkey['type'] == 'RSA_Private_Key':
-                        ret = rsakey.load_privatekey(json.dumps(prvkey))
+                        ret = rsakey.load_privatekey(serializer.dumps(prvkey))
                     basic_prvkey_sensible = basic_prvkey_sensible and ret
 
             except Exception,e:
@@ -254,14 +239,14 @@ class certificate(object):
         if raw:
             return ret
         else:
-            return json.dumps(ret)
+            return serializer.dumps(ret)
 
         log.info("Successfully made a sign.")
 
     def verify_sign(self,message,sign):
         try:
             if type(sign) == type(""):
-                j = json.loads(sign)
+                j = serializer.loads(sign)
             else:
                 j = sign
             
@@ -303,17 +288,19 @@ class certificate(object):
 
         log.info('Signing Certificate: Subject[%s] TrustLevel[%s] ValidTo[%s]',rawinfo['Certified_ID'],rawinfo['Trust_Level'],rawinfo['Valid_To'])
 
-        sig = self.do_sign(hashable_json(rawinfo),raw=True)
+        sig = self.do_sign(hashable_obj(rawinfo),raw=True)
 
         ret = {"Content":rawinfo,"Signature":sig}
 
         # 将签名写入 pubcert
         pubcert.signatures.append(ret)
 
+        print ret
+
         if raw:
             return ret
         else:
-            return json.dumps(ret)
+            return serializer.dumps(ret)
     def revoke_signature(self,pubcert, raw=False): # 提供产生对一个公域证书的撤回信息
         nowtime = time.time() + time.timezone
         rawinfo = {
@@ -322,7 +309,7 @@ class certificate(object):
             'Issuer_ID'             : self.get_id(),
             'Issue_UTC'             : int(nowtime),
         }
-        sig = self.do_sign(hashable_json(rawinfo),raw=True)
+        sig = self.do_sign(hashable_obj(rawinfo),raw=True)
         ret = {"Content":rawinfo,"Signature":sig}
         
         pubcert.signatures.append(ret)
@@ -330,13 +317,13 @@ class certificate(object):
         if raw:
             return ret
         else:
-            return json.dumps(ret)
+            return serializer.dumps(ret)
         
     def check_signature_content(self,content,loading=True):
         nowtime = time.time() + time.timezone
         try:
             if type(content) == type(""):
-                c = json.loads(content)
+                c = serializer.loads(content)
             else:
                 c = content
             if   c['Title'] == 'New_Signature':         # 处理新签名的保存等
@@ -382,7 +369,7 @@ class certificate(object):
     def signature_hash(self,sign):
         try:
             if type(sign) == type(""):
-                j = json.loads(sign)
+                j = serializer.loads(sign)
             else:
                 j = sign
             jc = j['Content']
@@ -399,7 +386,7 @@ class certificate(object):
         # 对于私或公用证书均可，加载一个签名信息，可能是签名或签名撤回信息
         try:
             if type(sign) == type(""):
-                j = json.loads(sign)
+                j = serializer.loads(sign)
             else:
                 j = sign
 
@@ -425,7 +412,7 @@ class certificate(object):
     def verify_signature(self,sign): # 用本公钥证书验证一个签名
         try:
             if type(sign) == type(""):
-                j = json.loads(sign)
+                j = serializer.loads(sign)
             else:
                 j = sign
             c = j['Content']
@@ -434,7 +421,7 @@ class certificate(object):
             if not self.check_signature_content(c,loading=False):
                 return False
 
-            return self.verify_sign(hashable_json(c),sig)
+            return self.verify_sign(hashable_obj(c),sig)
         except Exception,e:
             
             log.warning('Signature being invalid. Returning False. Details: %s',e)
@@ -456,20 +443,20 @@ class certificate(object):
             }
         return baseinfo
     def get_id(self):
-        return Hash('md5',hashable_json(self.get_baseinfo())).hexdigest()
+        return Hash('md5',hashable_obj(self.get_baseinfo())).hexdigest()
     def get_hash(self,algo,b64=True):
         if b64:
-            digest = Hash(algo,hashable_json(self.get_baseinfo())).digest().encode('base64')
+            digest = Hash(algo,hashable_obj(self.get_baseinfo())).digest().encode('base64')
         else:
-            digest = Hash(algo,hashable_json(self.get_baseinfo())).hexdigest()
+            digest = Hash(algo,hashable_obj(self.get_baseinfo())).hexdigest()
         return digest
     def get_public_text(self):
         # This will generate a publishable certificate text.
         # - subject
         # - pubkeyring
         baseinfo = self.get_baseinfo()        
-        # format json.
-        hash_source = hashable_json(baseinfo)
+        # format serializer.
+        hash_source = hashable_obj(baseinfo)
         # Get Hashes
         hashes = []
         for algoname in ['SHA512','SHA1','SHA256','MD5','WHIRLPOOL']:
@@ -488,10 +475,10 @@ class certificate(object):
             'Signatures'    : sigs,
             }
         # return
-        return json.dumps(j,indent=2,sort_keys=True)
+        return serializer.dumps(j,indent=2,sort_keys=True)
     def load_public_text(self,text):
         try:
-            j = json.loads(text)
+            j = serializer.loads(text)
             if j['Title'] != 'Xi_Certificate':
                 raise Exception("Seems not a Xi Project Certificate.")
 
@@ -517,9 +504,9 @@ class certificate(object):
                     pubkey = basic_public_key_ring[key]
 
                     if pubkey['type'] == 'EC_Public_Key':
-                        ret = eckey.load_publickey(json.dumps(pubkey))
+                        ret = eckey.load_publickey(serializer.dumps(pubkey))
                     elif pubkey['type'] == 'RSA_Public_Key':
-                        ret = rsakey.load_publickey(json.dumps(pubkey))
+                        ret = rsakey.load_publickey(serializer.dumps(pubkey))
                     basic_pubkey_sensible = basic_pubkey_sensible and ret
             except Exception,e:
                 print "Error occured: %s" % e
@@ -531,7 +518,7 @@ class certificate(object):
 
             # Verify Integrity
 
-            hash_source = hashable_json(basic)
+            hash_source = hashable_obj(basic)
             hash_recognized = False
             for fpinfo in fingerprint:
                 if Hash().recognizes(fpinfo['Algorithm']):
@@ -608,7 +595,7 @@ class certificate(object):
                 randomkey += chr(random.randint(0,255))
             randomkey = randomkey.encode('base64').replace('\n','')
             tempkey.append(randomkey)
-            keyparts[keyindex] = json.loads(pka.encrypt(randomkey,self._encryptor))
+            keyparts[keyindex] = serializer.loads(pka.encrypt(randomkey,self._encryptor))
 
             keyindex += 1
 
@@ -625,11 +612,11 @@ class certificate(object):
             'Title':'Certificate_Encrypted_Text',
             'Certificate_ID':self.get_id(),
             'Key_Parts':keyparts,
-            'Ciphertext':ciphertext.encode('base64'),
-            'Key_Digest':keydigest.encode('base64'),
+            'Ciphertext':ciphertext,#.encode('base64'),
+            'Key_Digest':keydigest,#.encode('base64'),
             }
         if not raw:
-            ret = json.dumps(ret)
+            ret = serializer.dumps(ret)
         return ret
     def private_decrypt(self,data):
         if not self.is_ours:
@@ -639,16 +626,16 @@ class certificate(object):
             raise Exception("This is a public certificate and cannot be used for decrypting.")
         try:
             if type(data) == str:
-                j = json.loads(data)
+                j = serializer.loads(data)
             else:
                 j = data
             if j['Title'] != 'Certificate_Encrypted_Text':
                 raise Exception("Not a encrypted text.")
             if j['Certificate_ID'] != self.get_id():
                 raise Exception("Not for this certificate to decrypt.")
-            ciphertext = j['Ciphertext'].decode('base64')
+            ciphertext = j['Ciphertext']#.decode('base64')
             keyparts   = j['Key_Parts']
-            keydigest  = j['Key_Digest'].decode('base64')
+            keydigest  = j['Key_Digest']#.decode('base64')
 
             tempkey = []
             for sqid in keyparts:

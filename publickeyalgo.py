@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
+import random
+import time
+import os
+import uuid
+import hashlib
+import math
+import logging
+import bson as serializer
 
-import random,time,os,json,uuid,hashlib,math,logging
 from M2Crypto import EC,RSA,BIO
 
 log = logging.getLogger('xi.publickeyalgo')
@@ -15,7 +22,7 @@ class PublicKeyAlgorithm(object):
     def __init__(self,keystr):
         try:
             if type(keystr) == str:
-                j = json.loads(keystr)
+                j = serializer.loads(keystr)
             else:
                 j = keystr
 
@@ -34,7 +41,7 @@ class PublicKeyAlgorithm(object):
             else:
                 raise Exception("Unrecognized type of public key.")
             
-            keystr = json.dumps(j)
+            keystr = serializer.dumps(j)
 
             if self.is_private_key:
                 self.key.load_privatekey(keystr)
@@ -119,13 +126,13 @@ class _RSA(object):
                'tkey':keyinfo.encode('base64'),
                'ciphertext':data.encode('base64'),
             }
-        return json.dumps(ret,indent=4)
+        return serializer.dumps(ret,indent=4)
     def decrypt(self,ciphertext,decryptor):
         if self._key == None:
             return False
         try:
             if type(ciphertext) == str:
-                j = json.loads(ciphertext)
+                j = serializer.loads(ciphertext)
             else:
                 j = ciphertext
             if j['type'] != 'RSA_Encrypted':
@@ -142,7 +149,7 @@ class _RSA(object):
     def load_publickey(self,publickey):
         # Try parse the public key info.
         try:
-            j = json.loads(publickey)
+            j = serializer.loads(publickey)
             if j['type'] != 'RSA_Public_Key':
                 raise Exception("This is not a public key thus cannot be loaded.")
             pkdata = j['data'].decode('base64')
@@ -167,7 +174,7 @@ class _RSA(object):
     def load_privatekey(self,privatekey):
         # Try parse the private key info.
         try:
-            j = json.loads(privatekey)
+            j = serializer.loads(privatekey)
             if j['type'] != 'RSA_Private_Key':
                 raise Exception("This is not a private key thus cannot be loaded.")
             pkdata = j['data'].decode('base64')
@@ -208,7 +215,7 @@ class _RSA(object):
             }
         if raw:
             return pkinfo
-        return json.dumps(pkinfo,indent=4)
+        return serializer.dumps(pkinfo,indent=4)
     def get_privatekey(self,raw=False):
         if self._key == None:
             return False
@@ -226,7 +233,7 @@ class _RSA(object):
             }
         if raw:
             return pkinfo
-        return json.dumps(pkinfo,indent=4)
+        return serializer.dumps(pkinfo)
     def _derive_pubkey(self):
         # derive EC public key instance from self._key
         if self._key == None:
@@ -470,8 +477,8 @@ class _EC(object):
         tempkey.save_pub_key_bio(membuff)
         publickey = membuff.read_all()  #open(filename).read()
 #        os.remove(filename)
-        # Return with json.
-        ret = json.dumps(
+        # Return with serializer.
+        ret = serializer.dumps(
             {
                 'type':'EC_Encrypted',
                 'public_key':publickey.encode('base64'),
@@ -484,7 +491,7 @@ class _EC(object):
             return False
         try:
             if type(ciphertext) == str:
-                j = json.loads(ciphertext)
+                j = serializer.loads(ciphertext)
             else:
                 j = ciphertext
             if j['type'] != 'EC_Encrypted':
@@ -510,7 +517,7 @@ class _EC(object):
     def load_publickey(self,publickey):
         # Try parse the public key info.
         try:
-            j = json.loads(publickey)
+            j = serializer.loads(publickey)
             if j['type'] != 'EC_Public_Key':
                 raise Exception("This is not a public key thus cannot be loaded.")
             if self._curves_id.has_key(j['curve']):
@@ -540,7 +547,7 @@ class _EC(object):
         # Try parse the private key info.
         try:
             if type(privatekey) == str:
-                j = json.loads(privatekey)
+                j = serializer.loads(privatekey)
             else:
                 j = privatekey
             if j['type'] != 'EC_Private_Key':
@@ -585,7 +592,7 @@ class _EC(object):
             }
         if raw:
             return pkinfo
-        return json.dumps(pkinfo,indent=4)
+        return serializer.dumps(pkinfo,indent=4)
     def get_privatekey(self,raw=False):
         if self._key == None or self._key_curve == None:
             return False
@@ -603,7 +610,7 @@ class _EC(object):
             }
         if raw:
             return pkinfo
-        return json.dumps(pkinfo,indent=4)
+        return serializer.dumps(pkinfo)
     def _derive_pubkey(self):
         # derive EC public key instance from self._key
         if self._key == None:
