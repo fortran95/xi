@@ -6,7 +6,6 @@ import os
 import uuid
 import shelve
 import logging
-import json
 
 from M2Crypto.util import passphrase_callback
 import bson as serializer
@@ -18,8 +17,19 @@ from hashes import Hash
 
 log = logging.getLogger('xi.ceritificate')
 
-def hashable_obj(input):
-    return json.dumps(input,sort_keys=True,indent=0,ensure_ascii=True).strip()
+def hashable_obj(i):
+    ret = ''
+    if type(i) in (tuple,list):
+        for each in i:
+            ret += hashable_obj(each).encode('hex') + ','
+    elif type(i) == dict:
+        keys = i.keys()
+        keys.sort()
+        for each in keys:
+            ret += '(%s,%s)' % (hashable_obj(each),hashable_obj(i[each]))
+    else:
+        ret = repr(i).encode('hex')
+    return ret
 
 class certificate(object):
     subject = None
@@ -444,7 +454,7 @@ class certificate(object):
         return Hash('md5',hashable_obj(self.get_baseinfo())).hexdigest()
     def get_hash(self,algo,b64=True):
         if b64:
-            digest = Hash(algo,hashable_obj(self.get_baseinfo())).digest().encode('base64')
+            digest = Hash(algo,hashable_obj(self.get_baseinfo())).digest()
         else:
             digest = Hash(algo,hashable_obj(self.get_baseinfo())).hexdigest()
         return digest
@@ -521,7 +531,7 @@ class certificate(object):
             for fpinfo in fingerprint:
                 if Hash().recognizes(fpinfo['Algorithm']):
                     hash_recognized = True
-                    calchash = Hash(fpinfo['Algorithm'],hash_source).digest().encode('base64')
+                    calchash = Hash(fpinfo['Algorithm'],hash_source).digest()
                     if calchash != fpinfo['Hash']:
                         raise Exception("Certificate has invalid hash, cannot verify its INTERGRITY.")
             if not hash_recognized:
@@ -591,7 +601,7 @@ class certificate(object):
             randomkey = ''
             for i in range(0,64):
                 randomkey += chr(random.randint(0,255))
-            randomkey = randomkey.encode('base64').replace('\n','')
+            randomkey = randomkey
             tempkey.append(randomkey)
             keyparts[keyindex] = serializer.loads(pka.encrypt(randomkey,self._encryptor))
 
@@ -610,8 +620,8 @@ class certificate(object):
             'Title':'Certificate_Encrypted_Text',
             'Certificate_ID':self.get_id(),
             'Key_Parts':keyparts,
-            'Ciphertext':ciphertext,#.encode('base64'),
-            'Key_Digest':keydigest,#.encode('base64'),
+            'Ciphertext':ciphertext,
+            'Key_Digest':keydigest,
             }
         if not raw:
             ret = serializer.dumps(ret)
@@ -631,9 +641,9 @@ class certificate(object):
                 raise Exception("Not a encrypted text.")
             if j['Certificate_ID'] != self.get_id():
                 raise Exception("Not for this certificate to decrypt.")
-            ciphertext = j['Ciphertext']#.decode('base64')
+            ciphertext = j['Ciphertext']
             keyparts   = j['Key_Parts']
-            keydigest  = j['Key_Digest']#.decode('base64')
+            keydigest  = j['Key_Digest']
 
             tempkey = []
             for sqid in keyparts:
