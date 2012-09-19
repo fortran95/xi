@@ -98,7 +98,7 @@ class certificate(object):
         keyindex = 1
         for k in self.keys:
             keydata = k.get_privatekey(raw=True)
-            savesh['Basic']['Public_Key_Ring'][keyindex] = keydata
+            savesh['Basic']['Public_Key_Ring'][str(keyindex)] = keydata
             keyindex += 1
 
         # save signatures
@@ -234,7 +234,7 @@ class certificate(object):
             choosenalgo = maxhash[random.randint(0,len(maxhash) - 1)]
 
             sig = signer.new(message,choosenalgo,raw)   # XXX 安全泄漏。应当考虑一种提供选择的方法
-            ret[keyindex] = sig
+            ret[str(keyindex)] = sig
             keyindex += 1
         if raw:
             return ret
@@ -294,8 +294,6 @@ class certificate(object):
 
         # 将签名写入 pubcert
         pubcert.signatures.append(ret)
-
-        print ret
 
         if raw:
             return ret
@@ -433,7 +431,7 @@ class certificate(object):
         keyindex = 1
         for k in self.keys:
             keydata = k.get_publickey(raw=True)
-            pubkeyring[keyindex] = keydata
+            pubkeyring[str(keyindex)] = keydata
             keyindex += 1
         baseinfo = {
                 'Version': '1',
@@ -475,7 +473,7 @@ class certificate(object):
             'Signatures'    : sigs,
             }
         # return
-        return serializer.dumps(j,indent=2,sort_keys=True)
+        return serializer.dumps(j)
     def load_public_text(self,text):
         try:
             j = serializer.loads(text)
