@@ -123,8 +123,8 @@ class _RSA(object):
         # Write out.
         ret = {
                'type':'RSA_Encrypted',
-               'tkey':keyinfo.encode('base64'),
-               'ciphertext':data.encode('base64'),
+               'tkey':keyinfo,
+               'ciphertext':data,
             }
         return serializer.dumps(ret,indent=4)
     def decrypt(self,ciphertext,decryptor):
@@ -137,8 +137,8 @@ class _RSA(object):
                 j = ciphertext
             if j['type'] != 'RSA_Encrypted':
                 raise Exception("Input may not be the intending ciphertext.")
-            tempkey = j['tkey'].decode('base64')
-            ciphertext= j['ciphertext'].decode('base64')
+            tempkey = j['tkey']
+            ciphertext= j['ciphertext']
         except:
             raise Exception("Bad RSA ciphertext format.")
         try:
@@ -152,7 +152,7 @@ class _RSA(object):
             j = serializer.loads(publickey)
             if j['type'] != 'RSA_Public_Key':
                 raise Exception("This is not a public key thus cannot be loaded.")
-            pkdata = j['data'].decode('base64')
+            pkdata = j['data']
             self.bits = int(j['bits'])
         except Exception,e:
             raise Exception("Failed loading publickey. Bad format. Error: %s" % e)
@@ -173,7 +173,7 @@ class _RSA(object):
             j = serializer.loads(privatekey)
             if j['type'] != 'RSA_Private_Key':
                 raise Exception("This is not a private key thus cannot be loaded.")
-            pkdata = j['data'].decode('base64')
+            pkdata = j['data']
             self.bits = int(j['bits'])
         except Exception,e:
             raise Exception("Failed loading privatekey. Bad format.")
@@ -200,7 +200,7 @@ class _RSA(object):
         pkinfo = {
                 'type'  :'RSA_Public_Key',
                 'bits'  :self.bits,
-                'data'  :pubkeydata.encode('base64')
+                'data'  :pubkeydata,
             }
         if raw:
             return pkinfo
@@ -216,7 +216,7 @@ class _RSA(object):
         pkinfo = {
                 'type'  :'RSA_Private_Key',
                 'bits'  :self.bits,
-                'data'  :prvkeydata.encode('base64')
+                'data'  :prvkeydata,
             }
         if raw:
             return pkinfo
@@ -432,13 +432,13 @@ class _EC(object):
         # sign the given DIGEST. Output was base64-encoded.
         if self._key == None:
             return False
-        return self._key.sign_dsa_asn1(digest).encode('base64')
+        return self._key.sign_dsa_asn1(digest)
     def verify(self,digest,sign):
         # verify the DIGEST with given SIGN.
         if self._pubkey == None:
             return False
         try:
-            sign = sign.decode('base64') # in sign we set output being base64-encoded.
+            sign = sign # in sign we set output being base64-encoded.
             if self._pubkey.verify_dsa_asn1(digest,sign):
                 return True
         except Exception,e:
@@ -464,8 +464,8 @@ class _EC(object):
         ret = serializer.dumps(
             {
                 'type':'EC_Encrypted',
-                'public_key':publickey.encode('base64'),
-                'ciphertext':ciphertext.encode('base64'),
+                'public_key':publickey,
+                'ciphertext':ciphertext,
             }
         )
         return ret
@@ -479,8 +479,8 @@ class _EC(object):
                 j = ciphertext
             if j['type'] != 'EC_Encrypted':
                 raise Exception("Input may not be the intending ciphertext.")
-            publickey = j['public_key'].decode('base64')
-            ciphertext= j['ciphertext'].decode('base64')
+            publickey = j['public_key']
+            ciphertext= j['ciphertext']
         except Exception,e:
             raise Exception("Bad EC ciphertext format.")
         try:
@@ -503,7 +503,7 @@ class _EC(object):
                 curve = self._curves_id[j['curve']]
             else:
                 raise Exception("Unrecognized EC curve specified.")
-            pkdata = j['data'].decode('base64')
+            pkdata = j['data']
         except Exception,e:
             raise Exception("Failed loading publickey. Bad format. Error: %s" % e)
         # If parsable, Write down and load.
@@ -532,7 +532,7 @@ class _EC(object):
                 curve = self._curves_id[j['curve']]
             else:
                 raise Exception("Unrecognized EC curve specified.")
-            pkdata = j['data'].decode('base64')
+            pkdata = j['data']
         except Exception,e:
             raise Exception("Failed loading privatekey. Bad format.")
         # If parsable, Write down and load.
@@ -559,7 +559,7 @@ class _EC(object):
         pkinfo = {
                 'type'  :'EC_Public_Key',
                 'curve' :self._curves_name[self._pubkey_curve],
-                'data'  :pubkeydata.encode('base64')
+                'data'  :pubkeydata,
             }
         if raw:
             return pkinfo
@@ -575,7 +575,7 @@ class _EC(object):
         pkinfo = {
                 'type'  :'EC_Private_Key',
                 'curve' :self._curves_name[self._key_curve],
-                'data'  :prvkeydata.encode('base64')
+                'data'  :prvkeydata,
             }
         if raw:
             return pkinfo
