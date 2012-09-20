@@ -126,7 +126,7 @@ class _RSA(object):
                'tkey':keyinfo,
                'ciphertext':data,
             }
-        return serializer.dumps(ret,indent=4)
+        return serializer.dumps(ret)
     def decrypt(self,ciphertext,decryptor):
         if self._key == None:
             return False
@@ -204,7 +204,7 @@ class _RSA(object):
             }
         if raw:
             return pkinfo
-        return serializer.dumps(pkinfo,indent=4)
+        return serializer.dumps(pkinfo)
     def get_privatekey(self,raw=False):
         if self._key == None:
             return False
@@ -503,7 +503,7 @@ class _EC(object):
                 curve = self._curves_id[j['curve']]
             else:
                 raise Exception("Unrecognized EC curve specified.")
-            pkdata = j['data']
+            pkdata = self._trim_keydata(j['data'],False,False)
         except Exception,e:
             raise Exception("Failed loading publickey. Bad format. Error: %s" % e)
         # If parsable, Write down and load.
@@ -532,7 +532,7 @@ class _EC(object):
                 curve = self._curves_id[j['curve']]
             else:
                 raise Exception("Unrecognized EC curve specified.")
-            pkdata = j['data']
+            pkdata = self._trim_keydata(j['data'],True,False)
         except Exception,e:
             raise Exception("Failed loading privatekey. Bad format.")
         # If parsable, Write down and load.
@@ -559,11 +559,11 @@ class _EC(object):
         pkinfo = {
                 'type'  :'EC_Public_Key',
                 'curve' :self._curves_name[self._pubkey_curve],
-                'data'  :pubkeydata,
+                'data'  :self._trim_keydata(pubkeydata,False,True),
             }
         if raw:
             return pkinfo
-        return serializer.dumps(pkinfo,indent=4)
+        return serializer.dumps(pkinfo)
     def get_privatekey(self,raw=False):
         if self._key == None or self._key_curve == None:
             return False
@@ -575,11 +575,12 @@ class _EC(object):
         pkinfo = {
                 'type'  :'EC_Private_Key',
                 'curve' :self._curves_name[self._key_curve],
-                'data'  :prvkeydata,
+                'data'  :self._trim_keydata(prvkeydata,True,True),
             }
         if raw:
             return pkinfo
         return serializer.dumps(pkinfo)
+
     def _derive_pubkey(self):
         # derive EC public key instance from self._key
         if self._key == None:
@@ -587,10 +588,33 @@ class _EC(object):
         membuff = BIO.MemoryBuffer()
         self._key.save_pub_key_bio(membuff)   #(filename)
         self._pubkey = EC.load_pub_key_bio(membuff)  #filename)
+    
+    def _trim_keydata(self,data,isPrivate,operation):
+        if operation: # True: Trim the data
+            if isPrivate:
+                data = data[30:]   # -----BEGIN EC PRIVATE KEY-----
+                data = data[:-28]  # -----END EC PRIVATE KEY-----
+            else:
+                data = data[29:]
+                data = data[:-27]
+            return data.strip().decode('base64')
+        else: # False: Reconstruct the data
+            data = data.encode('base64').strip()
+            if isPrivate:
+                data = "-----BEGIN EC PRIVATE KEY-----\n%s\n-----END EC PRIVATE KEY-----" % data
+            else:
+                data = "-----BEGIN EC PUBLIC KEY-----\n%s\n-----END EC PRIVATE KEY-----" % data
+            return data
 
 if __name__ == "__main__":
     r = _EC()
     r.generate()
     def encryptor(key,message):
         print "Encrypted with %s" % key.encode('hex')
-        return 
+        return
+
+    rprv = r.get_privatekey(True)
+    print rprv
+
+    r2 = _EC()
+    r2.load_privatekey(rprv)
