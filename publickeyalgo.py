@@ -6,6 +6,7 @@ import uuid
 import hashlib
 import math
 import logging
+import zlib
 import bson as serializer
 
 from M2Crypto import EC,RSA,BIO
@@ -152,7 +153,7 @@ class _RSA(object):
             j = serializer.loads(publickey)
             if j['type'] != 'RSA_Public_Key':
                 raise Exception("This is not a public key thus cannot be loaded.")
-            pkdata = j['data']
+            pkdata = self._trim_keydata(j['data'],False,False)
             self.bits = int(j['bits'])
         except Exception,e:
             raise Exception("Failed loading publickey. Bad format. Error: %s" % e)
@@ -170,12 +171,16 @@ class _RSA(object):
     def load_privatekey(self,privatekey):
         # Try parse the private key info.
         try:
-            j = serializer.loads(privatekey)
+            if type(privatekey) == str:
+                j = serializer.loads(privatekey)
+            else:
+                j = privatekey
             if j['type'] != 'RSA_Private_Key':
                 raise Exception("This is not a private key thus cannot be loaded.")
-            pkdata = j['data']
+            pkdata = self._trim_keydata(j['data'],True,False)
             self.bits = int(j['bits'])
         except Exception,e:
+            print str(e)
             raise Exception("Failed loading privatekey. Bad format.")
         # If parsable, Write down and load.
         try:
@@ -200,7 +205,7 @@ class _RSA(object):
         pkinfo = {
                 'type'  :'RSA_Public_Key',
                 'bits'  :self.bits,
-                'data'  :pubkeydata,
+                'data'  :self._trim_keydata(pubkeydata,False,True),
             }
         if raw:
             return pkinfo
@@ -216,7 +221,7 @@ class _RSA(object):
         pkinfo = {
                 'type'  :'RSA_Private_Key',
                 'bits'  :self.bits,
-                'data'  :prvkeydata,
+                'data'  :self._trim_keydata(prvkeydata,True,True),
             }
         if raw:
             return pkinfo
@@ -228,6 +233,24 @@ class _RSA(object):
         membuff = BIO.MemoryBuffer()
         self._key.save_pub_key_bio(membuff)  #(filename)
         self._pubkey = RSA.load_pub_key_bio(membuff)   #(filename)
+
+    def _trim_keydata(self,data,isPrivate,operation):
+        if operation: # True: Trim the data
+            if isPrivate:
+                data = data[31:]   # -----BEGIN RSA PRIVATE KEY-----
+                data = data[:-29]  # -----END RSA PRIVATE KEY-----
+            else:
+                data = data[30:]
+                data = data[:-28]
+            return data.strip().decode('base64')
+        else: # False: Reconstruct the data
+            data = data.encode('base64').strip()
+            if isPrivate:
+                data = "-----BEGIN RSA PRIVATE KEY-----\n%s\n-----END RSA PRIVATE KEY-----" % data
+            else:
+                data = "-----BEGIN RSA PUBLIC KEY-----\n%s\n-----END RSA PRIVATE KEY-----" % data
+            return data
+
 class _EC(object):
     _curves_name = {
         707:'NID_secp128r2',
@@ -607,8 +630,8 @@ class _EC(object):
             return data
 
 if __name__ == "__main__":
-    r = _EC()
-    r.generate()
+    r = _RSA()
+    r.generate(bits=1024)
     def encryptor(key,message):
         print "Encrypted with %s" % key.encode('hex')
         return
@@ -616,5 +639,5 @@ if __name__ == "__main__":
     rprv = r.get_privatekey(True)
     print rprv
 
-    r2 = _EC()
+    r2 = _RSA()
     r2.load_privatekey(rprv)
