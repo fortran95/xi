@@ -28,7 +28,7 @@ def hashable_obj(i):
         for each in keys:
             ret += '(%s,%s)' % (hashable_obj(each),hashable_obj(i[each]))
     else:
-        ret = repr(i).encode('hex')
+        ret = str(i).encode('hex')
     return ret
 
 class certificate(object):
@@ -452,7 +452,7 @@ class certificate(object):
         return baseinfo
     def get_id(self):
         return Hash('md5',hashable_obj(self.get_baseinfo())).hexdigest()
-    def get_hash(self,algo,b64=True):
+    def get_hash(self,algo,b64=False):
         if b64:
             digest = Hash(algo,hashable_obj(self.get_baseinfo())).digest()
         else:
@@ -531,8 +531,10 @@ class certificate(object):
             for fpinfo in fingerprint:
                 if Hash().recognizes(fpinfo['Algorithm']):
                     hash_recognized = True
-                    calchash = Hash(fpinfo['Algorithm'],hash_source).digest()
+                    calchash = Hash(fpinfo['Algorithm'],hash_source).hexdigest()
                     if calchash != fpinfo['Hash']:
+                        print calchash
+                        print fpinfo['Hash']
                         raise Exception("Certificate has invalid hash, cannot verify its INTERGRITY.")
             if not hash_recognized:
                 raise Exception("Cannot verify INTERGRITY of this certificate.")
@@ -609,7 +611,6 @@ class certificate(object):
 
         tempkey.sort()
         #print "Before generation:"
-        #print tempkey
         tempkey = "".join(tempkey)
 
         keydigest = Hash('md5',tempkey).digest()
@@ -675,22 +676,25 @@ if __name__ == "__main__":
     c.generate('NEO Example',level=50,bits=1024)
     d.generate('HMX Example',level=50,bits=1024)
     
+    d2 = certificate()
+    d2.load_public_text(d.get_public_text())
     sig = c.sign_certificate(d,trustlevel=1)
+    d2.load_signature(sig)
 
-#    d.load_signature(sig)
+    c2 = certificate()
+    c3 = certificate()
 
-    print d.get_public_text()
+    c2.load_public_text(c.get_public_text())
+#    c3.load_private_text(c.get_private_text())
 
-    exit()
+#    print d.get_public_text()
 
-    c.save_private_text('neo.private')
+#    c.save_private_text('neo.private')
+#    print c.get_public_text()
 
-    print c.get_public_text()
-
-    exit()
-    for i in range(0,100):
-        print '##########################'
-        try:
+    for i in range(0,1):#00):
+#        print '##########################'
+#        try:
 
 #    print c._decryptor('key',c._encryptor('key','hello,world!'))
 
@@ -699,10 +703,10 @@ if __name__ == "__main__":
 #    d.load_private_text('alice.private')
             text = ''
             for j in range(0,128):
-                text += chr(random.randint(0,255))
-            ped = c.public_encrypt(text,True)
+                text += 'a'#chr(random.randint(0,255))
+            ped = c2.public_encrypt(text,True)
 #    print ped
             print c.private_decrypt(ped)
-        except:
-            failure += 1
-    print "Failed %d times." % failure
+#        except:
+#            failure += 1
+#    print "Failed %d times." % failure

@@ -620,7 +620,6 @@ class _EC(object):
     
     def _trim_keydata(self,data,isPrivate,operation):
         if operation: # True: Trim the data
-            print data
             if isPrivate:
                 data = data[30:]   # -----BEGIN EC PRIVATE KEY-----
                 data = data[:-28]  # -----END EC PRIVATE KEY-----
