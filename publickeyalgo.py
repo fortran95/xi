@@ -150,7 +150,10 @@ class _RSA(object):
     def load_publickey(self,publickey):
         # Try parse the public key info.
         try:
-            j = serializer.loads(publickey)
+            if type(publickey) == str:
+                j = serializer.loads(publickey)
+            else:
+                j = publickey
             if j['type'] != 'RSA_Public_Key':
                 raise Exception("This is not a public key thus cannot be loaded.")
             pkdata = self._trim_keydata(j['data'],False,False)
@@ -240,15 +243,15 @@ class _RSA(object):
                 data = data[31:]   # -----BEGIN RSA PRIVATE KEY-----
                 data = data[:-29]  # -----END RSA PRIVATE KEY-----
             else:
-                data = data[30:]
-                data = data[:-28]
+                data = data[26:]
+                data = data[:-24]
             return data.strip().decode('base64')
         else: # False: Reconstruct the data
             data = data.encode('base64').strip()
             if isPrivate:
                 data = "-----BEGIN RSA PRIVATE KEY-----\n%s\n-----END RSA PRIVATE KEY-----" % data
             else:
-                data = "-----BEGIN RSA PUBLIC KEY-----\n%s\n-----END RSA PRIVATE KEY-----" % data
+                data = "-----BEGIN PUBLIC KEY-----\n%s\n-----END PUBLIC KEY-----" % data
             return data
 
 class _EC(object):
@@ -519,7 +522,10 @@ class _EC(object):
     def load_publickey(self,publickey):
         # Try parse the public key info.
         try:
-            j = serializer.loads(publickey)
+            if type(publickey) == str:
+                j = serializer.loads(publickey)
+            else:
+                j = publickey
             if j['type'] != 'EC_Public_Key':
                 raise Exception("This is not a public key thus cannot be loaded.")
             if self._curves_id.has_key(j['curve']):
@@ -614,19 +620,20 @@ class _EC(object):
     
     def _trim_keydata(self,data,isPrivate,operation):
         if operation: # True: Trim the data
+            print data
             if isPrivate:
                 data = data[30:]   # -----BEGIN EC PRIVATE KEY-----
                 data = data[:-28]  # -----END EC PRIVATE KEY-----
             else:
-                data = data[29:]
-                data = data[:-27]
+                data = data[26:]   # -----BEGIN PUBLIC KEY-----
+                data = data[:-24]  # -----END PUBLIC KEY------
             return data.strip().decode('base64')
         else: # False: Reconstruct the data
             data = data.encode('base64').strip()
             if isPrivate:
                 data = "-----BEGIN EC PRIVATE KEY-----\n%s\n-----END EC PRIVATE KEY-----" % data
             else:
-                data = "-----BEGIN EC PUBLIC KEY-----\n%s\n-----END EC PRIVATE KEY-----" % data
+                data = "-----BEGIN PUBLIC KEY-----\n%s\n-----END PUBLIC KEY-----" % data
             return data
 
 if __name__ == "__main__":
@@ -636,8 +643,8 @@ if __name__ == "__main__":
         print "Encrypted with %s" % key.encode('hex')
         return
 
-    rprv = r.get_privatekey(True)
+    rprv = r.get_publickey(True)
     print rprv
 
     r2 = _RSA()
-    r2.load_privatekey(rprv)
+    r2.load_publickey(rprv)
