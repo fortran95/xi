@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
-# Ç©ÃûĞÅÏ¢£¬ÊÇÒ»¸öµ¥¶ÀµÄÀà£¬±¾³ÌĞòÌá¹©ÁË²úÉú¡¢µ¼³ö¡¢µ¼Èë¡¢ÑéÖ¤Ò»¸öÇ©ÃûĞÅÏ¢µÄ·½·¨¡£
+# ç­¾åä¿¡æ¯ï¼Œæ˜¯ä¸€ä¸ªå•ç‹¬çš„ç±»ï¼Œæœ¬ç¨‹åºæä¾›äº†äº§ç”Ÿã€å¯¼å‡ºã€å¯¼å…¥ã€éªŒè¯ä¸€ä¸ªç­¾åä¿¡æ¯çš„æ–¹æ³•ã€‚
+import random
+import bson as serializer
 
 from hashes import *
 from publickeyalgo import PublicKeyAlgorithm
-import json,random
 
 class signature(object):
 
@@ -19,23 +20,23 @@ class signature(object):
         except Exception,e:
             raise Exception("Unable to sign, error: %s" % e)
         
-        signature = {'Type':'Signature','Digest_Method':digestmod,'Data':signraw.encode('base64')}
+        signature = {'Type':'Signature','Digest_Method':digestmod,'Data':signraw}
 
         if raw:
             return signature
         else:
-            return json.dumps(signature)
+            return serializer.dumps(signature)
 
     def verify(self,signature,message):
         try:
             if type(signature) == type(""):
-                j = json.loads(signature)
+                j = serializer.loads(signature)
             else:
                 j = signature
             if j['Type'] != 'Signature':
                 raise Exception("This may not be a signature.")
             digestmod = j['Digest_Method']
-            signraw = j['Data'].decode('base64')
+            signraw = j['Data']
 
             msghash = Hash(digestmod,message).digest()
             
